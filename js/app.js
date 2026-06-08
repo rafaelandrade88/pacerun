@@ -221,7 +221,7 @@ function setupAuth() {
 // ── Verifica se a URL atual é um link de sign-in Firebase ──
 async function checkEmailLink() {
   const { auth, isSignInWithEmailLink, signInWithEmailLink, db,
-          doc, setDoc, getDoc, updateProfile, serverTimestamp } = window.__firebase;
+    doc, setDoc, getDoc, updateProfile, serverTimestamp } = window.__firebase;
 
   if (!isSignInWithEmailLink(auth, window.location.href)) return;
 
@@ -343,8 +343,8 @@ async function completeRegistration() {
     const msg = e.code === 'permission-denied'
       ? 'Permissão negada no Firestore. Verifique as regras.'
       : e.code === 'auth/weak-password'
-      ? 'Senha muito fraca. Use pelo menos 6 caracteres.'
-      : `Erro: ${e.message || e.code}`;
+        ? 'Senha muito fraca. Use pelo menos 6 caracteres.'
+        : `Erro: ${e.message || e.code}`;
     showError(errEl, msg);
     btn.textContent = 'Criar minha conta';
     btn.disabled = false;
@@ -438,11 +438,11 @@ function navigateTo(page) {
   }
 
   // Carrega dados
-  if (page === 'progress')  loadProgress();
-  if (page === 'ranking')   loadRanking(document.querySelector('.ranking-tab.active')?.dataset.rank || 'distance');
+  if (page === 'progress') loadProgress();
+  if (page === 'ranking') loadRanking(document.querySelector('.ranking-tab.active')?.dataset.rank || 'distance');
   if (page === 'community') loadCommunity();
-  if (page === 'feed')      refreshFeedIfNeeded();
-  if (page === 'profile')   loadProfileData();
+  if (page === 'feed') refreshFeedIfNeeded();
+  if (page === 'profile') loadProfileData();
 }
 
 // ════════════════════════════════════════════════════════
@@ -785,8 +785,8 @@ async function saveActivity() {
     const msg = e.code === 'permission-denied'
       ? 'Permissão negada. Verifique as regras do Firestore.'
       : e.code === 'unavailable'
-      ? 'Sem conexão. Tente novamente.'
-      : `Erro: ${e.message || e.code || 'desconhecido'}`;
+        ? 'Sem conexão. Tente novamente.'
+        : `Erro: ${e.message || e.code || 'desconhecido'}`;
     showToast(msg, 5000);
   } finally {
     btn.textContent = 'Salvar atividade';
@@ -1032,7 +1032,7 @@ function renderFeed(articles) {
   }).join('');
 }
 
-window.toggleFeedCard = function(i) {
+window.toggleFeedCard = function (i) {
   const card = document.getElementById('news-card-' + i);
   if (!card) return;
   const isExpanded = card.classList.contains('expanded');
@@ -1243,7 +1243,7 @@ async function loadProgress() {
     // Summary totais
     const totalDist = activities.reduce((s, a) => s + (a.distance || 0), 0);
     const totalTime = activities.reduce((s, a) => s + (a.duration || 0), 0);
-    const totalCal  = activities.reduce((s, a) => s + (a.calories || 0), 0);
+    const totalCal = activities.reduce((s, a) => s + (a.calories || 0), 0);
 
     summaryEl.innerHTML = `
       <div class="progress-stat"><div class="val">${activities.length}</div><div class="lbl">Atividades</div></div>
@@ -1278,7 +1278,7 @@ async function loadProgress() {
 }
 
 // Detalhe de atividade
-window.openActivityDetail = async function(id) {
+window.openActivityDetail = async function (id) {
   const { db, doc, getDoc } = window.__firebase;
   const snap = await getDoc(doc(db, 'activities', id));
   if (!snap.exists()) return;
@@ -1368,8 +1368,8 @@ function setupProfilePage() {
 }
 
 async function uploadAvatar(dataURL) {
-  const CLOUD_NAME     = 'dzesgiw8e';
-  const UPLOAD_PRESET  = 'pacerun_unsigned';
+  const CLOUD_NAME = 'dzesgiw8e';
+  const UPLOAD_PRESET = 'pacerun_unsigned';
 
   const { db, doc, updateDoc } = window.__firebase;
 
@@ -1416,8 +1416,8 @@ async function uploadAvatar(dataURL) {
 
 // ── Upload de foto de atividade (Cloudinary) ──────────────
 async function uploadActivityPhoto(dataURL, activityId) {
-  const CLOUD_NAME     = 'dzesgiw8e';
-  const UPLOAD_PRESET  = 'pacerun_unsigned';
+  const CLOUD_NAME = 'dzesgiw8e';
+  const UPLOAD_PRESET = 'pacerun_unsigned';
 
   try {
     const formData = new FormData();
@@ -1529,7 +1529,7 @@ function shareFacebook() {
 function shareNative() {
   if (navigator.share) {
     navigator.share({ title: 'Minha atividade no PaceRun', text: buildShareText() })
-      .catch(() => {});
+      .catch(() => { });
   } else {
     copyToClipboard(buildShareText());
     showToast('Texto copiado para a área de transferência!');
@@ -1538,7 +1538,7 @@ function shareNative() {
 
 function copyToClipboard(text) {
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).catch(() => {});
+    navigator.clipboard.writeText(text).catch(() => { });
   }
 }
 
@@ -1549,8 +1549,8 @@ function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function calcCalories(distKm, durationSec) {
@@ -1565,8 +1565,8 @@ function formatDuration(seconds) {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
 function formatDateFull(isoStr) {
@@ -1611,14 +1611,14 @@ function readFileAsDataURL(file) {
 // NOTIFICAÇÕES + CONQUISTAS
 // ════════════════════════════════════════════════════════
 const ACHIEVEMENTS = [
-  { id: 'first_run', minRuns: 1,   emoji: '🏃', title: 'Primeira atividade!',   desc: 'Você completou sua primeira atividade no PaceRun. Bem-vindo!' },
-  { id: 'km_5',      minKm: 5,     emoji: '⭐', title: '5 km acumulados!',       desc: 'Você já percorreu 5 km no total. Continue assim!' },
-  { id: 'km_10',     minKm: 10,    emoji: '🔟', title: '10 km acumulados!',      desc: 'Marca dos 10 km atingida. Você está no caminho certo!' },
-  { id: 'km_25',     minKm: 25,    emoji: '🥈', title: '25 km acumulados!',      desc: 'Um quarto de maratona percorrido! Incrível evolução.' },
-  { id: 'km_50',     minKm: 50,    emoji: '🥇', title: '50 km acumulados!',      desc: 'Meio centenário! Você é um atleta de verdade.' },
-  { id: 'km_100',    minKm: 100,   emoji: '💯', title: '100 km acumulados!',     desc: 'Centenário! Uma conquista e tanto. Parabéns!' },
-  { id: 'runs_10',   minRuns: 10,  emoji: '🔥', title: '10 atividades!',         desc: '10 atividades completadas. A consistência é tudo!' },
-  { id: 'runs_50',   minRuns: 50,  emoji: '🏆', title: '50 atividades!',         desc: 'Você é um corredor dedicado. 50 atividades!' },
+  { id: 'first_run', minRuns: 1, emoji: '🏃', title: 'Primeira atividade!', desc: 'Você completou sua primeira atividade no PaceRun. Bem-vindo!' },
+  { id: 'km_5', minKm: 5, emoji: '⭐', title: '5 km acumulados!', desc: 'Você já percorreu 5 km no total. Continue assim!' },
+  { id: 'km_10', minKm: 10, emoji: '🔟', title: '10 km acumulados!', desc: 'Marca dos 10 km atingida. Você está no caminho certo!' },
+  { id: 'km_25', minKm: 25, emoji: '🥈', title: '25 km acumulados!', desc: 'Um quarto de maratona percorrido! Incrível evolução.' },
+  { id: 'km_50', minKm: 50, emoji: '🥇', title: '50 km acumulados!', desc: 'Meio centenário! Você é um atleta de verdade.' },
+  { id: 'km_100', minKm: 100, emoji: '💯', title: '100 km acumulados!', desc: 'Centenário! Uma conquista e tanto. Parabéns!' },
+  { id: 'runs_10', minRuns: 10, emoji: '🔥', title: '10 atividades!', desc: '10 atividades completadas. A consistência é tudo!' },
+  { id: 'runs_50', minRuns: 50, emoji: '🏆', title: '50 atividades!', desc: 'Você é um corredor dedicado. 50 atividades!' },
 ];
 
 function getNotifs() {
@@ -1676,7 +1676,7 @@ function openNotifModal() {
 
 function checkAchievements(totalKm, totalRuns) {
   ACHIEVEMENTS.forEach(a => {
-    const kmOk   = !a.minKm   || totalKm   >= a.minKm;
+    const kmOk = !a.minKm || totalKm >= a.minKm;
     const runsOk = !a.minRuns || totalRuns >= a.minRuns;
     if (kmOk && runsOk) addNotif({ id: a.id, emoji: a.emoji, title: a.title, desc: a.desc, type: 'achievement' });
   });
@@ -1699,7 +1699,7 @@ async function checkCommunityNotifications() {
         id: `comm_${d.id}`,
         emoji: a.type === 'walking' ? '🚶' : '🏃',
         title: `${a.userName} completou uma atividade!`,
-        desc: `${(a.distance||0).toFixed(2)} km em ${formatDuration(a.duration||0)} · Ritmo ${a.pace||'--'}`,
+        desc: `${(a.distance || 0).toFixed(2)} km em ${formatDuration(a.duration || 0)} · Ritmo ${a.pace || '--'}`,
         type: 'community',
       });
     });
@@ -1758,50 +1758,86 @@ function setupRaces() {
 
 async function searchRaces(city) {
   const loadingEl = document.getElementById('races-loading');
-  const emptyEl   = document.getElementById('races-empty');
-  const listEl    = document.getElementById('races-list');
+  const emptyEl = document.getElementById('races-empty');
+  const listEl = document.getElementById('races-list');
 
-  // Mostra loading
   emptyEl.classList.add('hidden');
   listEl.innerHTML = '';
   loadingEl.classList.remove('hidden');
   document.getElementById('races-loading-city').textContent = city;
 
-  // Cache por cidade + dia (evita chamar IA toda vez)
-  const cacheKey = `pacerun_races_${city.toLowerCase().replace(/\s/g,'_')}`;
-  const cacheTs  = `${cacheKey}_ts`;
-  const cached   = localStorage.getItem(cacheKey);
+  // Cache por cidade (12h) — evita chamar IA repetidamente
+  const cacheKey = `pacerun_races_${city.toLowerCase().replace(/\s+/g, '_')}`;
+  const cacheTs = `${cacheKey}_ts`;
+  const cached = localStorage.getItem(cacheKey);
   const cachedAt = parseInt(localStorage.getItem(cacheTs) || '0');
-  const twelveHours = 12 * 60 * 60 * 1000;
 
-  if (cached && (Date.now() - cachedAt < twelveHours)) {
+  if (cached && (Date.now() - cachedAt < 12 * 3600 * 1000)) {
     try {
       renderRaces(JSON.parse(cached), city);
       loadingEl.classList.add('hidden');
       return;
-    } catch { /* cache inválido */ }
+    } catch { /* cache inválido, segue */ }
   }
 
+  const year = new Date().getFullYear();
   const today = new Date().toLocaleDateString('pt-BR');
-  const year  = new Date().getFullYear();
+
+  // ── Estratégia: busca conteúdo real dos sites via fetch ──────────
+  // Fazemos o fetch dos sites de corrida e enviamos o HTML para o Claude extrair
+  let siteContent = '';
+
+  const sitesToFetch = [
+    `https://esportividade.com.br/corrida-de-rua/`,
+    `https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas`,
+  ];
+
+  for (const url of sitesToFetch) {
+    try {
+      // Usa proxy CORS público para buscar os sites
+      const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const html = json.contents || '';
+
+      // Extrai só o texto visível (remove tags HTML)
+      const text = html
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s{3,}/g, '\n')
+        .substring(0, 4000); // limita tamanho
+
+      if (text.length > 200) {
+        siteContent += `\n\n--- Conteúdo de ${url} ---\n${text}`;
+      }
+    } catch { /* site indisponível, continua */ }
+  }
 
   try {
+    const promptContent = siteContent.length > 200
+      ? `Você recebeu o conteúdo real de sites de corridas de rua no Brasil.
+         
+Conteúdo dos sites (texto extraído):
+${siteContent}
+
+Com base nesse conteúdo, liste as PRÓXIMAS corridas em ${city} ou na Grande São Paulo a partir de ${today} (${year}).`
+      : `Liste as próximas corridas de rua em ${city} e na Grande São Paulo em ${year}, com base no seu conhecimento sobre eventos esportivos brasileiros.
+         Considere corridas conhecidas que acontecem anualmente em São Paulo como Corrida de São Silvestre, Corrida do Morumbi, Meia Maratona de SP, Corrida Internacional de SP, Nike Run, entre outras.`;
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        max_tokens: 3000,
         messages: [{
           role: 'user',
-          content: `Pesquise na internet as PRÓXIMAS corridas de rua, caminhadas e eventos esportivos em ${city}, Brasil, a partir de hoje ${today} (${year}).
+          content: `${promptContent}
 
-Busque em sites como: corridasderua.com.br, corridabrasil.com.br, resultados.com.br, ticket.com.br e outros.
-
-Retorne APENAS JSON válido sem markdown:
+Retorne APENAS JSON válido (sem markdown, sem explicações) neste formato exato:
 {
-  "city": "${city}",
   "races": [
     {
       "name": "Nome oficial da corrida",
@@ -1810,41 +1846,40 @@ Retorne APENAS JSON válido sem markdown:
       "month": "MMM",
       "distances": ["5km", "10km"],
       "type": "Corrida de Rua",
-      "location": "Local ou bairro específico",
-      "description": "Breve descrição do evento em 1-2 frases",
-      "link": "https://url-oficial-do-evento.com.br ou null se não encontrar",
+      "location": "Local ou bairro em ${city} ou São Paulo",
+      "description": "Descrição curta e informativa do evento.",
+      "link": "https://link-oficial-do-evento.com.br",
       "confirmed": true
     }
   ]
 }
 
-Ordene por data crescente. Inclua somente eventos FUTUROS a partir de ${today}.
-Se não encontrar eventos confirmados, inclua eventos prováveis com confirmed: false.
-Retorne no mínimo 3 e no máximo 10 eventos.`
+Regras obrigatórias:
+- Apenas eventos FUTUROS a partir de ${today}
+- Ordenar por data crescente (mais próximo primeiro)
+- Entre 5 e 10 eventos
+- Priorizar eventos em ${city} e Grande São Paulo
+- Campo link: URL oficial se conhecer, caso contrário busca no Google (https://www.google.com/search?q=nome+da+corrida+${year})
+- confirmed: true se tiver certeza da data, false se for estimativa`
         }]
       })
     });
 
     const data = await response.json();
+    const text = (data.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('');
 
-    // Extrai o texto da resposta (pode ter tool_use intermediário)
-    let text = '';
-    if (data.content) {
-      for (const block of data.content) {
-        if (block.type === 'text') text += block.text;
-      }
-    }
-
-    const clean = text.replace(/```json[\s\S]*?```/g, t => t.slice(7, -3)).replace(/```/g, '').trim();
-
-    // Tenta parsear JSON da resposta
-    const jsonMatch = clean.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('JSON não encontrado na resposta');
+    const jsonMatch = text.match(/\{[\s\S]*"races"[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('JSON não encontrado');
 
     const parsed = JSON.parse(jsonMatch[0]);
-    const races = parsed.races || [];
+    const races = (parsed.races || []).filter(r => r.name);
 
-    // Salva cache
+    if (races.length === 0) throw new Error('Nenhuma corrida na resposta');
+
+    // Salva no cache
     localStorage.setItem(cacheKey, JSON.stringify(races));
     localStorage.setItem(cacheTs, Date.now().toString());
 
@@ -1852,19 +1887,39 @@ Retorne no mínimo 3 e no máximo 10 eventos.`
 
   } catch (e) {
     console.error('searchRaces error:', e);
-    // Fallback informativo
-    renderRaces([{
-      name: `Corridas em ${city} — Resultado indisponível`,
-      date: '',
-      day: '--',
-      month: '---',
-      distances: [],
-      type: 'Busca',
-      location: city,
-      description: 'Não foi possível buscar eventos no momento. Tente pesquisar diretamente em corridasderua.com.br',
-      link: `https://www.corridasderua.com.br/busca?q=${encodeURIComponent(city)}`,
-      confirmed: false,
-    }], city);
+    // Fallback com links diretos para os sites reais
+    renderRaces([
+      {
+        name: 'Calendário de Corridas SP 2026 — Olympics.com',
+        date: '', day: '📅', month: year.toString(),
+        distances: ['5km', '10km', '21km', '42km'],
+        type: 'Calendário Oficial',
+        location: 'São Paulo e região',
+        description: 'Calendário completo de corridas de rua em São Paulo publicado pelo Olympics.com.',
+        link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas',
+        confirmed: true,
+      },
+      {
+        name: 'Corridas de Rua — Esportividade',
+        date: '', day: '📅', month: year.toString(),
+        distances: ['Várias distâncias'],
+        type: 'Calendário',
+        location: 'São Paulo e região',
+        description: 'Portal com todos os eventos de corrida e caminhada no Brasil.',
+        link: 'https://esportividade.com.br/corrida-de-rua/',
+        confirmed: true,
+      },
+      {
+        name: `Buscar corridas em ${city} ${year}`,
+        date: '', day: '🔍', month: 'Google',
+        distances: [],
+        type: 'Pesquisa',
+        location: city,
+        description: `Toque para buscar eventos de corrida em ${city} diretamente no Google.`,
+        link: `https://www.google.com/search?q=corridas+de+rua+${encodeURIComponent(city)}+${year}`,
+        confirmed: false,
+      },
+    ], city);
   }
 
   loadingEl.classList.add('hidden');
