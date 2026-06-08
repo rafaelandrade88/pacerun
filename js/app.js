@@ -1327,7 +1327,12 @@ function loadProfileData() {
   document.getElementById('profile-name-input').value = name;
   document.getElementById('profile-weight').value = p.weight || 70;
 
-  const avatarUrl = p.photoURL || getAvatarUrl(name);
+  // Adiciona bust de cache para garantir foto mais recente
+  const baseUrl = p.photoURL || getAvatarUrl(name);
+  const avatarUrl = p.photoURL
+    ? `${p.photoURL}?v=${Date.now()}`
+    : baseUrl;
+
   document.getElementById('profile-avatar').src = avatarUrl;
   document.getElementById('header-avatar').src = avatarUrl;
 
@@ -1371,10 +1376,12 @@ async function uploadAvatar(dataURL) {
   try {
     showToast('Enviando foto...');
 
+    // Usa timestamp no public_id para garantir nova imagem a cada upload
+    const ts = Date.now();
     const formData = new FormData();
     formData.append('file', dataURL);
     formData.append('upload_preset', UPLOAD_PRESET);
-    formData.append('public_id', `pacerun/avatars/${State.user.uid}`);
+    formData.append('public_id', `pacerun/avatars/${State.user.uid}_${ts}`);
 
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
       method: 'POST',
@@ -1387,13 +1394,19 @@ async function uploadAvatar(dataURL) {
     }
 
     const data = await res.json();
-    const url = data.secure_url;
+    // Adiciona bust de cache na URL para o browser não usar a foto antiga
+    const url = `${data.secure_url}?v=${ts}`;
 
-    await updateDoc(doc(db, 'users', State.user.uid), { photoURL: url });
-    State.userProfile.photoURL = url;
+    await updateDoc(doc(db, 'users', State.user.uid), { photoURL: data.secure_url });
+    State.userProfile.photoURL = data.secure_url;
 
-    document.getElementById('profile-avatar').src = url;
-    document.getElementById('header-avatar').src = url;
+    // Força reload nos elementos de imagem
+    const avatarEls = document.querySelectorAll('#profile-avatar, #header-avatar');
+    avatarEls.forEach(el => {
+      el.src = '';
+      el.src = url;
+    });
+
     showToast('Foto de perfil atualizada! ✅');
   } catch (e) {
     console.error('Upload avatar error:', e);
