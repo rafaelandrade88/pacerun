@@ -401,36 +401,35 @@ function setupNav() {
 function navigateTo(page) {
   State.currentPage = page;
 
-  // Esconde todas as páginas
+  // Esconde TODAS as páginas de forma uniforme
   document.querySelectorAll('.page').forEach(p => {
     p.classList.remove('active');
-    p.style.display = 'none';
+    p.style.display = '';   // limpa qualquer inline style anterior
+    p.style.removeProperty('display');
   });
 
-  // Mostra a página alvo
+  // Mostra só a página alvo via classe (o CSS cuida do display)
   const target = document.getElementById('page-' + page);
   if (target) {
     target.classList.add('active');
-    // Atividade usa flex, demais usam block
-    target.style.display = page === 'activity' ? 'flex' : 'block';
   }
 
-  // Controles fixos: só visíveis na aba de atividade
+  // Controles fixos de atividade
   const fixedControls = document.getElementById('activity-controls-fixed');
   if (fixedControls) {
     fixedControls.classList.toggle('visible', page === 'activity');
   }
 
-  // Atualiza nav ativa
+  // Nav highlight
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
 
-  // Rola para o topo (não aplica à atividade que não scrolla)
+  // Scroll topo nas páginas de lista
   if (page !== 'activity') {
     document.getElementById('app-main')?.scrollTo(0, 0);
   }
 
-  // Carrega dados da página
+  // Carrega dados
   if (page === 'progress') loadProgress();
   if (page === 'ranking') loadRanking(document.querySelector('.ranking-tab.active')?.dataset.rank || 'distance');
   if (page === 'community') loadCommunity();
@@ -862,76 +861,136 @@ function resetActivity() {
 let _feedLoaded = false;
 
 function refreshFeedIfNeeded() {
-  if (!_feedLoaded) loadFeed();
+  // Recarrega se: nunca carregou OU último carregamento foi há mais de 6h (renovação diária)
+  const lastLoad = parseInt(localStorage.getItem('pacerun_feed_ts') || '0');
+  const sixHours = 6 * 60 * 60 * 1000;
+  if (!_feedLoaded || (Date.now() - lastLoad > sixHours)) {
+    _feedLoaded = false;
+    loadFeed();
+  }
 }
 
 async function loadFeed() {
   const loadingEl = document.getElementById('feed-loading');
   const contentEl = document.getElementById('feed-content');
 
-  // Detecta localização para personalizar
+  loadingEl.classList.remove('hidden');
+  contentEl.classList.add('hidden');
+
+  // Tenta usar cache do dia
+  const cached = localStorage.getItem('pacerun_feed_cache');
+  const cachedTs = parseInt(localStorage.getItem('pacerun_feed_ts') || '0');
+  const sixHours = 6 * 60 * 60 * 1000;
+
+  if (cached && (Date.now() - cachedTs < sixHours)) {
+    try {
+      const articles = JSON.parse(cached);
+      renderFeed(articles);
+      loadingEl.classList.add('hidden');
+      contentEl.classList.remove('hidden');
+      _feedLoaded = true;
+      return;
+    } catch { /* cache inválido, segue para buscar novo */ }
+  }
+
+  // Detecta localização
   let locationLabel = 'Brasil';
   try {
     const pos = await new Promise((res, rej) =>
       navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 })
     );
     const { latitude, longitude } = pos.coords;
-    // Reverse geocoding simples (IP-based fallback)
     try {
       const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
-      const data = await r.json();
-      locationLabel = data.address?.city || data.address?.town || data.address?.state || 'sua região';
+      const geoData = await r.json();
+      locationLabel = geoData.address?.city || geoData.address?.town || geoData.address?.state || 'sua região';
     } catch { locationLabel = 'sua região'; }
-  } catch { /* sem GPS, usa padrão */ }
+  } catch { /* sem GPS */ }
 
   document.getElementById('feed-location-label').textContent = `Conteúdo para ${locationLabel}`;
 
-  // Chama Anthropic API para gerar notícias
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: 3000,
         messages: [{
           role: 'user',
           content: `Você é um editor esportivo especializado em corrida e caminhada no Brasil.
-          
-Gere 4 artigos sobre corrida ou caminhada relevantes para a região: ${locationLabel}.
+
+Gere 5 artigos variados sobre corrida ou caminhada relevantes para a região: ${locationLabel}.
 Retorne APENAS JSON válido (sem markdown, sem explicações) neste formato exato:
 {
   "articles": [
     {
-      "tag": "Dica",
-      "title": "Título do artigo aqui",
-      "description": "Resumo de 2 frases que aparece no card fechado.",
-      "fullText": "Texto completo do artigo com 4 a 6 parágrafos bem escritos, informativos e úteis para corredores. Use quebras de linha entre parágrafos com \\n\\n.",
-      "readTime": "3 min"
+      "tag": "Treino",
+      "title": "Título específico e atraente",
+      "description": "Resumo curto de 2 frases que aparece no card fechado.",
+      "fullText": "Texto completo com 5 a 7 parágrafos ricos em informação, dicas práticas e motivação para corredores brasileiros. Separe os parágrafos com \\n\\n. Seja específico, use exemplos reais e linguagem acessível.",
+      "readTime": "4 min"
     }
   ]
 }
 
-As tags devem variar entre: Dica, Treino, Nutrição, Evento, Motivação, Saúde.
-Os títulos devem ser específicos, práticos e úteis para corredores brasileiros.`
+Use tags variadas: Dica, Treino, Nutrição, Evento, Motivação, Saúde, Equipamento.
+Os títulos devem ser específicos, práticos e diferentes entre si.
+Hoje é ${new Date().toLocaleDateString('pt-BR')} — gere conteúdo fresco e atual.`
         }]
       })
     });
 
     const data = await response.json();
     const text = data.content?.[0]?.text || '{}';
-    const clean = text.replace(/```json|```/g, '').trim();
+    const clean = text.replace(/```json[\s\S]*?```/g, t => t.slice(7, -3)).replace(/```/g, '').trim();
     const parsed = JSON.parse(clean);
+    const articles = parsed.articles || [];
 
-    renderFeed(parsed.articles || []);
+    // Salva no cache
+    localStorage.setItem('pacerun_feed_cache', JSON.stringify(articles));
+    localStorage.setItem('pacerun_feed_ts', Date.now().toString());
+
+    renderFeed(articles);
   } catch (e) {
     console.error('Feed error:', e);
-    // Fallback estático
+    // Fallback com conteúdo rico
     renderFeed([
-      { tag: 'Treino', title: '5 treinos para aumentar seu ritmo em 30 dias', description: 'Descubra como o treinamento intervalado pode transformar sua performance em semanas.', readTime: '3 min' },
-      { tag: 'Nutrição', title: 'O que comer antes de uma corrida longa', description: 'A nutrição pré-treino é fundamental para manter a energia durante longos percursos.', readTime: '4 min' },
-      { tag: 'Dica', title: 'Como evitar lesões nos joelhos ao correr', description: 'Técnicas de passada e alongamentos essenciais para proteger suas articulações.', readTime: '2 min' },
-      { tag: 'Motivação', title: 'A ciência por trás do "segundo fôlego"', description: 'Entenda o fenômeno que faz corredores sentirem energia renovada no meio da corrida.', readTime: '3 min' },
+      {
+        tag: 'Treino',
+        title: '5 treinos para aumentar seu ritmo em 30 dias',
+        description: 'O treinamento intervalado é a forma mais eficiente de melhorar sua velocidade.',
+        fullText: 'O treinamento intervalado (HIIT) é considerado o método mais eficaz para corredores que querem melhorar o ritmo rapidamente. A ciência mostra que alternar períodos de alta intensidade com recuperação ativa treina tanto o sistema aeróbico quanto o anaeróbico.\n\nSemana 1-2: Comece com intervalos de 30 segundos em ritmo forte, seguidos de 90 segundos de trote. Repita 6-8 vezes, duas vezes por semana.\n\nSemana 3-4: Aumente para 1 minuto forte e 1 minuto de recuperação. Adicione uma terceira sessão semanal com um rodão longo em ritmo confortável.\n\nAlém dos intervalos, inclua corridas de progressão — comece devagar e acelere gradualmente nos últimos 20% do percurso. Esse treino ensina seu corpo a correr rápido quando está cansado.\n\nNão esqueça do descanso: músculos crescem e se adaptam durante o repouso. Atletas amadores costumam errar por excesso de treino. Durma bem, se alimente adequadamente e respeite os dias de recuperação.',
+        readTime: '4 min'
+      },
+      {
+        tag: 'Nutrição',
+        title: 'O que comer antes e depois de correr',
+        description: 'A alimentação certa pode fazer a diferença entre uma corrida ótima e uma sofrível.',
+        fullText: 'A nutrição para corredores vai muito além de comer macarrão antes de uma prova. O que você come nas 2-3 horas anteriores à corrida tem impacto direto na sua energia, foco e recuperação.\n\nPré-corrida (1-2h antes): Prefira carboidratos de fácil digestão — banana com mel, torrada com geleia, aveia com frutas. Evite gorduras e fibras em excesso, que podem causar desconforto gastrointestinal.\n\nDurante corridas longas (acima de 60 min): Considere géis energéticos ou tâmaras a cada 45 minutos para manter a glicemia estável e evitar o "muro".\n\nPós-corrida (até 30 min após): A janela anabólica é real. Consuma proteínas + carboidratos — iogurte com granola, ovo com pão integral, shake de proteína com banana. Isso acelera a recuperação muscular.\n\nHidratação: Beba 500ml de água 2h antes de correr. Durante, 150-200ml a cada 20 minutos. Após, repôs 150% do peso perdido em suor.',
+        readTime: '5 min'
+      },
+      {
+        tag: 'Saúde',
+        title: 'Como evitar as lesões mais comuns na corrida',
+        description: 'Joelho do corredor, fascite plantar e canelite têm causas preveníveis.',
+        fullText: 'Cerca de 70% dos corredores se lesionam pelo menos uma vez por ano. A boa notícia é que a maioria das lesões é prevenível com algumas mudanças simples de hábito.\n\nJoelho do corredor (síndrome patelofemoral): Causado geralmente por fraqueza nos glúteos e quadríceps. Inclua agachamentos, elevações de quadril e exercícios de fortalecimento lateral 2-3x por semana.\n\nFascite plantar: Dor no calcanhar, especialmente pela manhã. Causas: aumento brusco de volume de treino, calçado inadequado e encurtamento do músculo gastrocnêmio. Alongue a panturrilha diariamente e role uma bolinha de tênis sob o pé.\n\nCanelite (síndrome do estresse tibial): Comum em iniciantes que aumentam o volume rápido demais. Siga a regra dos 10%: nunca aumente seu volume semanal em mais de 10%.\n\nSolados e pisada: Consulte uma loja especializada para análise de pisada. Um calçado adequado ao seu tipo de pisada (neutra, pronada ou supinada) reduz drasticamente o risco de lesões.',
+        readTime: '4 min'
+      },
+      {
+        tag: 'Motivação',
+        title: 'A psicologia por trás de manter a consistência',
+        description: 'Motivação vem e vai — disciplina e hábito são o que realmente te mantém correndo.',
+        fullText: 'Todo corredor conhece aqueles dias em que a última coisa que quer fazer é calçar o tênis. A ciência do comportamento tem respostas práticas para isso.\n\nO sistema de recompensa do cérebro: Correr libera dopamina, endorfina e serotonina — mas apenas após alguns minutos de atividade. O truque é chegar nesses primeiros 10 minutos. Diga a si mesmo: "Vou correr só 10 minutos, e se não quiser continuar, paro." Quase sempre você vai continuar.\n\nIdentidade, não metas: Pesquisas mostram que pessoas que se identificam como corredores (não apenas como "alguém tentando correr") têm muito mais consistência. Mude a narrativa interna: "Eu sou um corredor" em vez de "Estou tentando correr".\n\nTorne inevitável: Deixe o tênis ao lado da cama, programe o alarme com a roupa já separada, combine com alguém. Reduza ao máximo a resistência para começar.\n\nCelebração de pequenas vitórias: Cada saída conta. Um registro no app, uma foto, uma anotação no diário — reconheça cada conquista, por menor que seja. O cérebro aprende a associar correr com prazer.',
+        readTime: '4 min'
+      },
+      {
+        tag: 'Equipamento',
+        title: 'Como escolher o tênis certo para seu tipo de pisada',
+        description: 'O calçado errado é responsável por boa parte das lesões em corredores.',
+        fullText: 'Escolher um tênis de corrida vai muito além de estética ou marca. O calçado precisa se adaptar ao seu tipo de pisada, ao tipo de terreno e ao seu volume de treino.\n\nTipos de pisada: Pronada (o pé entorta para dentro) — precisa de tênis com suporte medial. Supinada (entorta para fora) — precisa de amortecimento extra. Neutra — maior variedade de opções disponíveis.\n\nComo descobrir sua pisada: Olhe o desgaste do seu tênis atual. Desgaste no lado interno = pronação. Lado externo = supinação. Central = neutra. Lojas especializadas oferecem análise gratuita na esteira.\n\nDrop e amortecimento: Drop é a diferença de altura entre calcanhar e ponta do pé. Alto drop (8-12mm) distribui mais impacto no calcanhar — bom para quem aterrissa no calcanhar. Baixo drop (0-4mm) incentiva pisada no médio/antepé.\n\nVida útil: Um tênis de corrida dura em média 600-800km. Marque no app quando comprou e quantos km rodou. Usar um tênis desgastado é uma das principais causas de lesão.',
+        readTime: '5 min'
+      },
     ]);
   }
 
@@ -942,7 +1001,14 @@ Os títulos devem ser específicos, práticos e úteis para corredores brasileir
 
 function renderFeed(articles) {
   const contentEl = document.getElementById('feed-content');
-  contentEl.innerHTML = articles.map((a, i) => `
+  contentEl.innerHTML = articles.map((a, i) => {
+    // Converte \n\n em parágrafos HTML
+    const fullHtml = (a.fullText || a.description)
+      .split('\n\n')
+      .map(p => `<p style="margin-bottom:12px">${p.trim()}</p>`)
+      .join('');
+
+    return `
     <article class="news-card" id="news-card-${i}" onclick="toggleFeedCard(${i})">
       <div class="news-card-body">
         <div style="display:flex;align-items:center;justify-content:space-between">
@@ -951,21 +1017,23 @@ function renderFeed(articles) {
         </div>
         <h3 class="news-card-title">${a.title}</h3>
         <p class="news-card-desc">${a.description}</p>
-        <p class="news-card-meta">⏱ ${a.readTime} de leitura · toque para expandir</p>
+        <p class="news-card-meta">⏱ ${a.readTime} de leitura · toque para ler</p>
       </div>
-      <div class="news-card-full">${a.fullText || a.description}</div>
-    </article>
-  `).join('');
+      <div class="news-card-full">${fullHtml}</div>
+    </article>`;
+  }).join('');
 }
 
 window.toggleFeedCard = function(i) {
   const card = document.getElementById('news-card-' + i);
   if (!card) return;
   const isExpanded = card.classList.contains('expanded');
-  // Fecha todos
   document.querySelectorAll('.news-card.expanded').forEach(c => c.classList.remove('expanded'));
-  // Abre o clicado (se não estava aberto)
-  if (!isExpanded) card.classList.add('expanded');
+  if (!isExpanded) {
+    card.classList.add('expanded');
+    // Scroll suave para o card
+    setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }
 };
 
 // ════════════════════════════════════════════════════════
@@ -1133,22 +1201,41 @@ async function loadProgress() {
   if (!State.user) return;
 
   listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Carregando...</p>';
+  summaryEl.innerHTML = '';
 
   try {
-    const q = query(
-      collection(db, 'activities'),
-      where('userId', '==', State.user.uid),
-      orderBy('timestamp', 'desc')
-    );
-    const snap = await getDocs(q);
-    const activities = [];
-    snap.forEach(d => activities.push({ id: d.id, ...d.data() }));
+    let activities = [];
 
-    // Summary
-    const totalDist = activities.reduce((s, a) => s + a.distance, 0);
-    const totalTime = activities.reduce((s, a) => s + a.duration, 0);
-    const totalCal = activities.reduce((s, a) => s + (a.calories || 0), 0);
-    const bestDist = activities.length > 0 ? Math.max(...activities.map(a => a.distance)) : 0;
+    // Tenta com índice composto primeiro
+    try {
+      const q = query(
+        collection(db, 'activities'),
+        where('userId', '==', State.user.uid),
+        orderBy('timestamp', 'desc')
+      );
+      const snap = await getDocs(q);
+      snap.forEach(d => activities.push({ id: d.id, ...d.data() }));
+    } catch (indexErr) {
+      // Índice não existe ainda — busca só por userId e ordena no cliente
+      console.warn('Índice composto não criado, usando fallback:', indexErr.message);
+      const q2 = query(
+        collection(db, 'activities'),
+        where('userId', '==', State.user.uid)
+      );
+      const snap2 = await getDocs(q2);
+      snap2.forEach(d => activities.push({ id: d.id, ...d.data() }));
+      // Ordena por timestamp decrescente no cliente
+      activities.sort((a, b) => {
+        const ta = a.timestamp?.seconds || a.timestamp || 0;
+        const tb = b.timestamp?.seconds || b.timestamp || 0;
+        return tb - ta;
+      });
+    }
+
+    // Summary totais
+    const totalDist = activities.reduce((s, a) => s + (a.distance || 0), 0);
+    const totalTime = activities.reduce((s, a) => s + (a.duration || 0), 0);
+    const totalCal  = activities.reduce((s, a) => s + (a.calories || 0), 0);
 
     summaryEl.innerHTML = `
       <div class="progress-stat"><div class="val">${activities.length}</div><div class="lbl">Atividades</div></div>
@@ -1158,27 +1245,27 @@ async function loadProgress() {
     `;
 
     if (activities.length === 0) {
-      listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Nenhuma atividade registrada ainda.<br>Comece sua primeira corrida! 🏃</p>';
+      listEl.innerHTML = '<p style="padding:40px 20px;color:var(--text-muted);text-align:center">Nenhuma atividade ainda.<br>Complete sua primeira corrida! 🏃</p>';
       return;
     }
 
     listEl.innerHTML = activities.map(a => `
-      <div class="history-card" data-id="${a.id}" onclick="openActivityDetail('${a.id}')">
+      <div class="history-card" onclick="openActivityDetail('${a.id}')">
         <div class="history-card-header">
-          <span class="history-type-badge ${a.type}">${a.type === 'running' ? '🏃 Corrida' : '🚶 Caminhada'}</span>
+          <span class="history-type-badge ${a.type || 'running'}">${a.type === 'walking' ? '🚶 Caminhada' : '🏃 Corrida'}</span>
           <span class="history-date">${formatDateFull(a.date)}</span>
         </div>
-        <div class="history-main-stat">${a.distance.toFixed(2)} <span>km</span></div>
+        <div class="history-main-stat">${(a.distance || 0).toFixed(2)} <span>km</span></div>
         <div class="history-details">
-          <div class="history-detail"><div class="v">${formatDuration(a.duration)}</div><div class="l">Duração</div></div>
-          <div class="history-detail"><div class="v">${a.pace}</div><div class="l">Ritmo</div></div>
-          <div class="history-detail"><div class="v">${Math.round(a.calories)}</div><div class="l">kcal</div></div>
+          <div class="history-detail"><div class="v">${formatDuration(a.duration || 0)}</div><div class="l">Duração</div></div>
+          <div class="history-detail"><div class="v">${a.pace || '--:--'}</div><div class="l">Ritmo</div></div>
+          <div class="history-detail"><div class="v">${Math.round(a.calories || 0)}</div><div class="l">kcal</div></div>
         </div>
       </div>
     `).join('');
   } catch (e) {
-    console.error(e);
-    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Erro ao carregar histórico.</p>';
+    console.error('loadProgress error:', e);
+    listEl.innerHTML = `<p style="padding:20px;color:var(--text-muted);text-align:center">Erro: ${e.message}<br><small>Verifique as regras do Firestore.</small></p>`;
   }
 }
 
@@ -1268,23 +1355,14 @@ function setupProfilePage() {
 }
 
 async function uploadAvatar(dataURL) {
-  // ── Cloudinary — upload direto do browser, plano gratuito ──
-  // Configure em: https://cloudinary.com → Settings → Upload → Upload presets
-  // Crie um preset com "Signing Mode: Unsigned" e cole o nome abaixo
-  const CLOUD_NAME  = 'dzesgiw8e';   // Ex: 'dxyz1234'
-  const UPLOAD_PRESET = 'pacerun_unsigned';     // Ex: 'pacerun_unsigned'
-
-  if (CLOUD_NAME === 'dzesgiw8e') {
-    showToast('⚠️ Configure o Cloudinary no app.js para habilitar fotos.');
-    return;
-  }
+  const CLOUD_NAME     = 'dzesgiw8e';
+  const UPLOAD_PRESET  = 'pacerun_unsigned';
 
   const { db, doc, updateDoc } = window.__firebase;
 
   try {
     showToast('Enviando foto...');
 
-    // Converte dataURL → Blob → FormData (Cloudinary aceita ambos)
     const formData = new FormData();
     formData.append('file', dataURL);
     formData.append('upload_preset', UPLOAD_PRESET);
@@ -1296,12 +1374,14 @@ async function uploadAvatar(dataURL) {
       body: formData,
     });
 
-    if (!res.ok) throw new Error(`Cloudinary error: ${res.status}`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `HTTP ${res.status}`);
+    }
 
     const data = await res.json();
     const url = data.secure_url;
 
-    // Salva URL no Firestore
     await updateDoc(doc(db, 'users', State.user.uid), { photoURL: url });
     State.userProfile.photoURL = url;
 
@@ -1310,16 +1390,14 @@ async function uploadAvatar(dataURL) {
     showToast('Foto de perfil atualizada! ✅');
   } catch (e) {
     console.error('Upload avatar error:', e);
-    showToast('Erro ao enviar foto. Verifique o Cloudinary.');
+    showToast(`Erro ao enviar foto: ${e.message}`);
   }
 }
 
 // ── Upload de foto de atividade (Cloudinary) ──────────────
 async function uploadActivityPhoto(dataURL, activityId) {
-  const CLOUD_NAME    = 'SEU_CLOUD_NAME';
-  const UPLOAD_PRESET = 'SEU_PRESET';
-
-  if (CLOUD_NAME === 'SEU_CLOUD_NAME') return null;
+  const CLOUD_NAME     = 'dzesgiw8e';
+  const UPLOAD_PRESET  = 'pacerun_unsigned';
 
   try {
     const formData = new FormData();
@@ -1511,177 +1589,112 @@ function readFileAsDataURL(file) {
 }
 
 // ════════════════════════════════════════════════════════
-// NOTIFICAÇÕES
+// NOTIFICAÇÕES + CONQUISTAS
 // ════════════════════════════════════════════════════════
-
-// Conquistas por distância total acumulada
 const ACHIEVEMENTS = [
-  { id: 'first_run',   threshold: 0,    emoji: '🏃', title: 'Primeira atividade!',    desc: 'Você completou sua primeira corrida no PaceRun. Bem-vindo!' },
-  { id: 'km_5',        threshold: 5,    emoji: '⭐', title: '5 km acumulados!',        desc: 'Você já percorreu 5 km no total. Continue assim!' },
-  { id: 'km_10',       threshold: 10,   emoji: '🔟', title: '10 km acumulados!',       desc: 'Marca dos 10 km atingida. Você está no caminho certo!' },
-  { id: 'km_25',       threshold: 25,   emoji: '🥈', title: '25 km acumulados!',       desc: 'Um quarto de maratona percorrido! Incrível evolução.' },
-  { id: 'km_50',       threshold: 50,   emoji: '🥇', title: '50 km acumulados!',       desc: 'Meio centenário de quilômetros! Você é um atleta de verdade.' },
-  { id: 'km_100',      threshold: 100,  emoji: '💯', title: '100 km acumulados!',      desc: 'Centenário! Uma conquista e tanto. Parabéns, corredor!' },
-  { id: 'km_500',      threshold: 500,  emoji: '🏆', title: '500 km acumulados!',      desc: 'Lendário! 500 km rodados. Você é uma inspiração!' },
+  { id: 'first_run', minRuns: 1,   emoji: '🏃', title: 'Primeira atividade!',   desc: 'Você completou sua primeira atividade no PaceRun. Bem-vindo!' },
+  { id: 'km_5',      minKm: 5,     emoji: '⭐', title: '5 km acumulados!',       desc: 'Você já percorreu 5 km no total. Continue assim!' },
+  { id: 'km_10',     minKm: 10,    emoji: '🔟', title: '10 km acumulados!',      desc: 'Marca dos 10 km atingida. Você está no caminho certo!' },
+  { id: 'km_25',     minKm: 25,    emoji: '🥈', title: '25 km acumulados!',      desc: 'Um quarto de maratona percorrido! Incrível evolução.' },
+  { id: 'km_50',     minKm: 50,    emoji: '🥇', title: '50 km acumulados!',      desc: 'Meio centenário! Você é um atleta de verdade.' },
+  { id: 'km_100',    minKm: 100,   emoji: '💯', title: '100 km acumulados!',     desc: 'Centenário! Uma conquista e tanto. Parabéns!' },
+  { id: 'runs_10',   minRuns: 10,  emoji: '🔥', title: '10 atividades!',         desc: '10 atividades completadas. A consistência é tudo!' },
+  { id: 'runs_50',   minRuns: 50,  emoji: '🏆', title: '50 atividades!',         desc: 'Você é um corredor dedicado. 50 atividades!' },
 ];
 
-function setupNotifications() {
-  // Botão sininho
-  document.getElementById('btn-notifications')?.addEventListener('click', () => {
-    openNotificationsModal();
-  });
-
-  document.getElementById('btn-close-notifications')?.addEventListener('click', () => {
-    document.getElementById('modal-notifications').classList.add('hidden');
-  });
-
-  document.getElementById('btn-mark-all-read')?.addEventListener('click', () => {
-    markAllNotificationsRead();
-  });
-
-  // Carrega notificações do localStorage
-  renderNotificationsBadge();
+function getNotifs() {
+  try { return JSON.parse(localStorage.getItem('pacerun_notifs') || '[]'); } catch { return []; }
 }
+function saveNotifs(n) { localStorage.setItem('pacerun_notifs', JSON.stringify(n)); }
 
-function getStoredNotifications() {
-  try {
-    return JSON.parse(localStorage.getItem('pacerun_notifications') || '[]');
-  } catch { return []; }
-}
-
-function saveNotifications(notifs) {
-  localStorage.setItem('pacerun_notifications', JSON.stringify(notifs));
-}
-
-function addNotification(notif) {
-  const notifs = getStoredNotifications();
-  // Evita duplicata pelo id
-  if (notif.id && notifs.find(n => n.id === notif.id)) return;
-  notifs.unshift({ ...notif, timestamp: Date.now(), read: false });
-  // Mantém max 50
+function addNotif(notif) {
+  const notifs = getNotifs();
+  if (notif.id && notifs.find(n => n.id === notif.id)) return; // sem duplicata
+  notifs.unshift({ ...notif, ts: Date.now(), read: false });
   if (notifs.length > 50) notifs.splice(50);
-  saveNotifications(notifs);
-  renderNotificationsBadge();
-  // Toast
+  saveNotifs(notifs);
+  updateNotifBadge();
   showToast(`${notif.emoji} ${notif.title}`);
 }
 
-function renderNotificationsBadge() {
-  const notifs = getStoredNotifications();
-  const unread = notifs.filter(n => !n.read).length;
+function updateNotifBadge() {
+  const unread = getNotifs().filter(n => !n.read).length;
   const badge = document.getElementById('notif-badge');
   if (!badge) return;
-  if (unread > 0) {
-    badge.textContent = unread > 9 ? '9+' : unread;
-    badge.classList.remove('hidden');
-  } else {
-    badge.classList.add('hidden');
-  }
+  if (unread > 0) { badge.textContent = unread > 9 ? '9+' : unread; badge.classList.remove('hidden'); }
+  else { badge.classList.add('hidden'); }
 }
 
-function openNotificationsModal() {
-  const notifs = getStoredNotifications();
-  const listEl = document.getElementById('notifications-list');
+function setupNotifications() {
+  document.getElementById('btn-notifications')?.addEventListener('click', openNotifModal);
+  document.getElementById('btn-close-notifications')?.addEventListener('click', () => {
+    document.getElementById('modal-notifications').classList.add('hidden');
+  });
+  document.getElementById('btn-mark-all-read')?.addEventListener('click', () => {
+    saveNotifs(getNotifs().map(n => ({ ...n, read: true })));
+    updateNotifBadge();
+    openNotifModal();
+  });
+  updateNotifBadge();
+}
 
-  if (notifs.length === 0) {
-    listEl.innerHTML = `
-      <div class="notif-empty">
-        <div style="font-size:40px;margin-bottom:12px">🔔</div>
-        <p>Nenhuma notificação ainda.<br>Complete atividades para ganhar conquistas!</p>
-      </div>`;
-  } else {
-    listEl.innerHTML = notifs.map(n => `
-      <div class="notif-item ${n.read ? '' : 'unread'}">
-        <div class="notif-icon ${n.type || 'achievement'}">${n.emoji}</div>
-        <div class="notif-body">
-          <div class="notif-title">${n.title}</div>
-          <div class="notif-desc">${n.desc}</div>
-          <div class="notif-time">${formatTimeAgo(n.timestamp)}</div>
-        </div>
-      </div>
-    `).join('');
-  }
-
+function openNotifModal() {
+  const notifs = getNotifs();
+  const el = document.getElementById('notifications-list');
+  el.innerHTML = notifs.length === 0
+    ? `<div class="notif-empty"><div style="font-size:40px;margin-bottom:12px">🔔</div><p>Nenhuma notificação ainda.<br>Complete atividades para ganhar conquistas!</p></div>`
+    : notifs.map(n => `
+        <div class="notif-item ${n.read ? '' : 'unread'}">
+          <div class="notif-icon ${n.type || 'achievement'}">${n.emoji}</div>
+          <div class="notif-body">
+            <div class="notif-title">${n.title}</div>
+            <div class="notif-desc">${n.desc}</div>
+            <div class="notif-time">${formatTimeAgo(n.ts)}</div>
+          </div>
+        </div>`).join('');
   document.getElementById('modal-notifications').classList.remove('hidden');
 }
 
-function markAllNotificationsRead() {
-  const notifs = getStoredNotifications().map(n => ({ ...n, read: true }));
-  saveNotifications(notifs);
-  renderNotificationsBadge();
-  openNotificationsModal(); // re-renderiza
-}
-
-// Verifica conquistas após salvar atividade
-function checkAchievements(totalDistance, totalRuns) {
-  // Conquista de primeira corrida
-  if (totalRuns === 1) {
-    addNotification({
-      id: 'first_run',
-      emoji: '🏃',
-      title: 'Primeira atividade!',
-      desc: 'Você completou sua primeira atividade no PaceRun. Bem-vindo à jornada!',
-      type: 'achievement',
-    });
-  }
-
-  // Conquistas por distância
-  ACHIEVEMENTS.filter(a => a.threshold > 0).forEach(ach => {
-    if (totalDistance >= ach.threshold) {
-      addNotification({
-        id: ach.id,
-        emoji: ach.emoji,
-        title: ach.title,
-        desc: ach.desc,
-        type: 'achievement',
-      });
-    }
+function checkAchievements(totalKm, totalRuns) {
+  ACHIEVEMENTS.forEach(a => {
+    const kmOk   = !a.minKm   || totalKm   >= a.minKm;
+    const runsOk = !a.minRuns || totalRuns >= a.minRuns;
+    if (kmOk && runsOk) addNotif({ id: a.id, emoji: a.emoji, title: a.title, desc: a.desc, type: 'achievement' });
   });
 }
 
-// Notificação de atividade de outro usuário (verifica periodicamente)
 async function checkCommunityNotifications() {
   if (!State.user) return;
   const { db, collection, query, orderBy, limit, getDocs, where } = window.__firebase;
-
   try {
-    // Pega atividades recentes (última hora) de outros usuários
-    const oneHourAgo = new Date(Date.now() - 3600000);
     const q = query(
       collection(db, 'activities'),
       where('userId', '!=', State.user.uid),
-      orderBy('userId'),
-      orderBy('timestamp', 'desc'),
+      orderBy('userId'), orderBy('timestamp', 'desc'),
       limit(5)
     );
     const snap = await getDocs(q);
     snap.forEach(d => {
       const a = d.data();
-      const notifId = `community_${d.id}`;
-      const notifs = getStoredNotifications();
-      if (!notifs.find(n => n.id === notifId)) {
-        addNotification({
-          id: notifId,
-          emoji: a.type === 'running' ? '🏃' : '🚶',
-          title: `${a.userName} completou uma atividade!`,
-          desc: `${a.distance?.toFixed(2)} km em ${formatDuration(a.duration || 0)} · Ritmo ${a.pace}`,
-          type: 'community',
-        });
-      }
+      addNotif({
+        id: `comm_${d.id}`,
+        emoji: a.type === 'walking' ? '🚶' : '🏃',
+        title: `${a.userName} completou uma atividade!`,
+        desc: `${(a.distance||0).toFixed(2)} km em ${formatDuration(a.duration||0)} · Ritmo ${a.pace||'--'}`,
+        type: 'community',
+      });
     });
-  } catch (e) {
-    // Índice composto não disponível ainda — ignora silenciosamente
-  }
+  } catch { /* índice não criado ainda */ }
 }
 
-function formatTimeAgo(timestamp) {
-  if (!timestamp) return '';
-  const diff = Date.now() - timestamp;
-  const min = Math.floor(diff / 60000);
+function formatTimeAgo(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const m = Math.floor(diff / 60000);
   const h = Math.floor(diff / 3600000);
   const d = Math.floor(diff / 86400000);
-  if (min < 1) return 'agora mesmo';
-  if (min < 60) return `há ${min} min`;
+  if (m < 1) return 'agora mesmo';
+  if (m < 60) return `há ${m} min`;
   if (h < 24) return `há ${h}h`;
   return `há ${d} dia${d > 1 ? 's' : ''}`;
 }
