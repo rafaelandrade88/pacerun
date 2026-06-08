@@ -1375,7 +1375,6 @@ async function uploadAvatar(dataURL) {
     formData.append('file', dataURL);
     formData.append('upload_preset', UPLOAD_PRESET);
     formData.append('public_id', `pacerun/avatars/${State.user.uid}`);
-    formData.append('overwrite', 'true');
 
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
       method: 'POST',
@@ -1412,7 +1411,6 @@ async function uploadActivityPhoto(dataURL, activityId) {
     formData.append('file', dataURL);
     formData.append('upload_preset', UPLOAD_PRESET);
     formData.append('public_id', `pacerun/activities/${State.user.uid}/${activityId}`);
-    formData.append('overwrite', 'true');
 
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
       method: 'POST',
