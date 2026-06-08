@@ -361,12 +361,13 @@ function setupApp() {
   setupNav();
   setupActivityPage();
   setupProfilePage();
+  setupNotifications();
   navigateTo('activity');
   loadFeed();
-  loadCommunity();
   loadRanking('distance');
-  loadProgress();
   loadProfileData();
+  // Verifica notificações da comunidade com delay
+  setTimeout(checkCommunityNotifications, 3000);
 }
 
 function updateHeaderUI() {
@@ -410,15 +411,24 @@ function navigateTo(page) {
   const target = document.getElementById('page-' + page);
   if (target) {
     target.classList.add('active');
-    target.style.display = 'block';
+    // Atividade usa flex, demais usam block
+    target.style.display = page === 'activity' ? 'flex' : 'block';
+  }
+
+  // Controles fixos: só visíveis na aba de atividade
+  const fixedControls = document.getElementById('activity-controls-fixed');
+  if (fixedControls) {
+    fixedControls.classList.toggle('visible', page === 'activity');
   }
 
   // Atualiza nav ativa
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
 
-  // Rola para o topo
-  document.getElementById('app-main')?.scrollTo(0, 0);
+  // Rola para o topo (não aplica à atividade que não scrolla)
+  if (page !== 'activity') {
+    document.getElementById('app-main')?.scrollTo(0, 0);
+  }
 
   // Carrega dados da página
   if (page === 'progress') loadProgress();
@@ -432,20 +442,8 @@ function navigateTo(page) {
 // ACTIVITY TRACKING
 // ════════════════════════════════════════════════════════
 function setupActivityPage() {
-  // Type selector
-  document.querySelectorAll('.type-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (State.activity.running) return;
-      document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      State.activity.type = btn.dataset.type;
-    });
-  });
-
-  // Start/Pause button
+  // Start/Pause e Stop (nos controles fixos)
   document.getElementById('btn-start-stop').addEventListener('click', handleStartStop);
-
-  // Stop button
   document.getElementById('btn-stop').addEventListener('click', handleStop);
 
   // Photo button
@@ -766,6 +764,12 @@ async function saveActivity() {
     showToast('Atividade salva com sucesso! 🎉');
     document.getElementById('modal-summary').classList.add('hidden');
     resetActivity();
+
+    // Verifica conquistas
+    const newTotal = State.userProfile?.totalDistance || 0;
+    const newRuns = State.userProfile?.totalRuns || 0;
+    checkAchievements(newTotal, newRuns);
+
     if (State.currentPage === 'progress') loadProgress();
 
   } catch (e) {
@@ -889,26 +893,27 @@ async function loadFeed() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
+        max_tokens: 2000,
         messages: [{
           role: 'user',
           content: `Você é um editor esportivo especializado em corrida e caminhada no Brasil.
           
-Gere 4 notícias/dicas sobre corrida ou caminhada relevantes para a região: ${locationLabel}.
+Gere 4 artigos sobre corrida ou caminhada relevantes para a região: ${locationLabel}.
 Retorne APENAS JSON válido (sem markdown, sem explicações) neste formato exato:
 {
   "articles": [
     {
       "tag": "Dica",
-      "title": "Título da notícia aqui",
-      "description": "Descrição de 2 frases sobre o conteúdo.",
-      "readTime": "2 min"
+      "title": "Título do artigo aqui",
+      "description": "Resumo de 2 frases que aparece no card fechado.",
+      "fullText": "Texto completo do artigo com 4 a 6 parágrafos bem escritos, informativos e úteis para corredores. Use quebras de linha entre parágrafos com \\n\\n.",
+      "readTime": "3 min"
     }
   ]
 }
 
 As tags devem variar entre: Dica, Treino, Nutrição, Evento, Motivação, Saúde.
-Os títulos devem ser específicos e úteis para corredores.`
+Os títulos devem ser específicos, práticos e úteis para corredores brasileiros.`
         }]
       })
     });
@@ -937,57 +942,108 @@ Os títulos devem ser específicos e úteis para corredores.`
 
 function renderFeed(articles) {
   const contentEl = document.getElementById('feed-content');
-  contentEl.innerHTML = articles.map(a => `
-    <article class="news-card">
+  contentEl.innerHTML = articles.map((a, i) => `
+    <article class="news-card" id="news-card-${i}" onclick="toggleFeedCard(${i})">
       <div class="news-card-body">
-        <span class="news-card-tag">${a.tag}</span>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span class="news-card-tag">${a.tag}</span>
+          <svg class="news-card-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
         <h3 class="news-card-title">${a.title}</h3>
         <p class="news-card-desc">${a.description}</p>
-        <p class="news-card-meta">⏱ ${a.readTime} de leitura</p>
+        <p class="news-card-meta">⏱ ${a.readTime} de leitura · toque para expandir</p>
       </div>
+      <div class="news-card-full">${a.fullText || a.description}</div>
     </article>
   `).join('');
 }
+
+window.toggleFeedCard = function(i) {
+  const card = document.getElementById('news-card-' + i);
+  if (!card) return;
+  const isExpanded = card.classList.contains('expanded');
+  // Fecha todos
+  document.querySelectorAll('.news-card.expanded').forEach(c => c.classList.remove('expanded'));
+  // Abre o clicado (se não estava aberto)
+  if (!isExpanded) card.classList.add('expanded');
+};
 
 // ════════════════════════════════════════════════════════
 // COMMUNITY
 // ════════════════════════════════════════════════════════
 async function loadCommunity(searchTerm = '') {
-  const { db, collection, getDocs, query, orderBy, limit } = window.__firebase;
+  const { db, collection, getDocs, query, orderBy, limit, where } = window.__firebase;
   const listEl = document.getElementById('community-list');
   listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Carregando...</p>';
 
   try {
-    const q = query(collection(db, 'users'), orderBy('totalDistance', 'desc'), limit(20));
+    // Busca todos os usuários EXCETO o atual
+    const q = query(collection(db, 'users'), orderBy('totalDistance', 'desc'), limit(30));
     const snap = await getDocs(q);
-    const users = [];
-    snap.forEach(d => users.push({ id: d.id, ...d.data() }));
+    let users = [];
+    snap.forEach(d => {
+      // Exclui o próprio usuário
+      if (d.id !== State.user?.uid) users.push({ id: d.id, ...d.data() });
+    });
 
-    const filtered = searchTerm
-      ? users.filter(u => u.name?.toLowerCase().includes(searchTerm.toLowerCase()))
-      : users;
+    if (searchTerm) {
+      users = users.filter(u => u.name?.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
 
-    if (filtered.length === 0) {
-      listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Nenhum usuário encontrado.</p>';
+    if (users.length === 0) {
+      listEl.innerHTML = `
+        <div style="padding:40px 20px;text-align:center;color:var(--text-muted)">
+          <div style="font-size:40px;margin-bottom:12px">👥</div>
+          <p>${searchTerm ? 'Nenhum usuário encontrado.' : 'Ainda não há outros usuários. Convide amigos!'}</p>
+        </div>`;
       return;
     }
 
-    listEl.innerHTML = filtered.map(u => `
-      <div class="user-card">
-        <img class="user-avatar" src="${u.photoURL || getAvatarUrl(u.name || 'U')}" alt="${u.name}" onerror="this.src='${getAvatarUrl(u.name || 'U')}'" />
-        <div class="user-info">
-          <div class="user-name">${u.name || 'Atleta'}</div>
-          <div class="user-stats">
-            ${(u.totalDistance || 0).toFixed(1)} km · ${u.totalRuns || 0} atividades
+    // Busca última atividade de cada usuário (em paralelo, limitado)
+    const activityPromises = users.slice(0, 20).map(async u => {
+      try {
+        const aq = query(
+          collection(db, 'activities'),
+          where('userId', '==', u.id),
+          orderBy('timestamp', 'desc'),
+          limit(1)
+        );
+        const aSnap = await getDocs(aq);
+        if (!aSnap.empty) {
+          u.lastActivity = aSnap.docs[0].data();
+        }
+      } catch (e) { /* índice pode não existir ainda, ignora */ }
+      return u;
+    });
+
+    await Promise.all(activityPromises);
+
+    listEl.innerHTML = users.map(u => {
+      const dist = (u.totalDistance || 0).toFixed(1);
+      const runs = u.totalRuns || 0;
+      const last = u.lastActivity;
+      const lastText = last
+        ? `Última: ${last.type === 'running' ? '🏃' : '🚶'} ${last.distance?.toFixed(2)} km · ${formatDateShort(last.date)}`
+        : 'Ainda sem atividades';
+
+      return `
+        <div class="user-card">
+          <img class="user-avatar" src="${u.photoURL || getAvatarUrl(u.name || 'U')}"
+               alt="${u.name}" onerror="this.src='${getAvatarUrl(u.name || 'U')}'" />
+          <div class="user-info">
+            <div class="user-name">${u.name || 'Atleta'}</div>
+            <div class="user-stats">${dist} km total · ${runs} atividade${runs !== 1 ? 's' : ''}</div>
+            <div class="community-activity-badge">${lastText}</div>
           </div>
-        </div>
-        <div style="color:var(--blue-300);font-family:var(--font-display);font-size:16px;font-weight:700">
-          ${(u.totalDistance || 0).toFixed(1)}<span style="font-size:12px;color:var(--text-muted)"> km</span>
-        </div>
-      </div>
-    `).join('');
+          <div style="color:var(--blue-300);font-family:var(--font-display);font-size:18px;font-weight:800;text-align:right;flex-shrink:0">
+            ${dist}<br><span style="font-size:11px;color:var(--text-muted);font-family:var(--font-body);font-weight:400">km</span>
+          </div>
+        </div>`;
+    }).join('');
+
   } catch (e) {
-    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Erro ao carregar. Verifique conexão.</p>';
+    console.error('loadCommunity error:', e);
+    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Erro ao carregar comunidade.</p>';
   }
 }
 
@@ -1215,10 +1271,10 @@ async function uploadAvatar(dataURL) {
   // ── Cloudinary — upload direto do browser, plano gratuito ──
   // Configure em: https://cloudinary.com → Settings → Upload → Upload presets
   // Crie um preset com "Signing Mode: Unsigned" e cole o nome abaixo
-  const CLOUD_NAME  = 'SEU_CLOUD_NAME';   // Ex: 'dxyz1234'
-  const UPLOAD_PRESET = 'SEU_PRESET';     // Ex: 'pacerun_unsigned'
+  const CLOUD_NAME  = 'dzesgiw8e';   // Ex: 'dxyz1234'
+  const UPLOAD_PRESET = 'pacerun_unsigned';     // Ex: 'pacerun_unsigned'
 
-  if (CLOUD_NAME === 'SEU_CLOUD_NAME') {
+  if (CLOUD_NAME === 'dzesgiw8e') {
     showToast('⚠️ Configure o Cloudinary no app.js para habilitar fotos.');
     return;
   }
@@ -1452,6 +1508,182 @@ function readFileAsDataURL(file) {
     reader.onerror = rej;
     reader.readAsDataURL(file);
   });
+}
+
+// ════════════════════════════════════════════════════════
+// NOTIFICAÇÕES
+// ════════════════════════════════════════════════════════
+
+// Conquistas por distância total acumulada
+const ACHIEVEMENTS = [
+  { id: 'first_run',   threshold: 0,    emoji: '🏃', title: 'Primeira atividade!',    desc: 'Você completou sua primeira corrida no PaceRun. Bem-vindo!' },
+  { id: 'km_5',        threshold: 5,    emoji: '⭐', title: '5 km acumulados!',        desc: 'Você já percorreu 5 km no total. Continue assim!' },
+  { id: 'km_10',       threshold: 10,   emoji: '🔟', title: '10 km acumulados!',       desc: 'Marca dos 10 km atingida. Você está no caminho certo!' },
+  { id: 'km_25',       threshold: 25,   emoji: '🥈', title: '25 km acumulados!',       desc: 'Um quarto de maratona percorrido! Incrível evolução.' },
+  { id: 'km_50',       threshold: 50,   emoji: '🥇', title: '50 km acumulados!',       desc: 'Meio centenário de quilômetros! Você é um atleta de verdade.' },
+  { id: 'km_100',      threshold: 100,  emoji: '💯', title: '100 km acumulados!',      desc: 'Centenário! Uma conquista e tanto. Parabéns, corredor!' },
+  { id: 'km_500',      threshold: 500,  emoji: '🏆', title: '500 km acumulados!',      desc: 'Lendário! 500 km rodados. Você é uma inspiração!' },
+];
+
+function setupNotifications() {
+  // Botão sininho
+  document.getElementById('btn-notifications')?.addEventListener('click', () => {
+    openNotificationsModal();
+  });
+
+  document.getElementById('btn-close-notifications')?.addEventListener('click', () => {
+    document.getElementById('modal-notifications').classList.add('hidden');
+  });
+
+  document.getElementById('btn-mark-all-read')?.addEventListener('click', () => {
+    markAllNotificationsRead();
+  });
+
+  // Carrega notificações do localStorage
+  renderNotificationsBadge();
+}
+
+function getStoredNotifications() {
+  try {
+    return JSON.parse(localStorage.getItem('pacerun_notifications') || '[]');
+  } catch { return []; }
+}
+
+function saveNotifications(notifs) {
+  localStorage.setItem('pacerun_notifications', JSON.stringify(notifs));
+}
+
+function addNotification(notif) {
+  const notifs = getStoredNotifications();
+  // Evita duplicata pelo id
+  if (notif.id && notifs.find(n => n.id === notif.id)) return;
+  notifs.unshift({ ...notif, timestamp: Date.now(), read: false });
+  // Mantém max 50
+  if (notifs.length > 50) notifs.splice(50);
+  saveNotifications(notifs);
+  renderNotificationsBadge();
+  // Toast
+  showToast(`${notif.emoji} ${notif.title}`);
+}
+
+function renderNotificationsBadge() {
+  const notifs = getStoredNotifications();
+  const unread = notifs.filter(n => !n.read).length;
+  const badge = document.getElementById('notif-badge');
+  if (!badge) return;
+  if (unread > 0) {
+    badge.textContent = unread > 9 ? '9+' : unread;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+function openNotificationsModal() {
+  const notifs = getStoredNotifications();
+  const listEl = document.getElementById('notifications-list');
+
+  if (notifs.length === 0) {
+    listEl.innerHTML = `
+      <div class="notif-empty">
+        <div style="font-size:40px;margin-bottom:12px">🔔</div>
+        <p>Nenhuma notificação ainda.<br>Complete atividades para ganhar conquistas!</p>
+      </div>`;
+  } else {
+    listEl.innerHTML = notifs.map(n => `
+      <div class="notif-item ${n.read ? '' : 'unread'}">
+        <div class="notif-icon ${n.type || 'achievement'}">${n.emoji}</div>
+        <div class="notif-body">
+          <div class="notif-title">${n.title}</div>
+          <div class="notif-desc">${n.desc}</div>
+          <div class="notif-time">${formatTimeAgo(n.timestamp)}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('modal-notifications').classList.remove('hidden');
+}
+
+function markAllNotificationsRead() {
+  const notifs = getStoredNotifications().map(n => ({ ...n, read: true }));
+  saveNotifications(notifs);
+  renderNotificationsBadge();
+  openNotificationsModal(); // re-renderiza
+}
+
+// Verifica conquistas após salvar atividade
+function checkAchievements(totalDistance, totalRuns) {
+  // Conquista de primeira corrida
+  if (totalRuns === 1) {
+    addNotification({
+      id: 'first_run',
+      emoji: '🏃',
+      title: 'Primeira atividade!',
+      desc: 'Você completou sua primeira atividade no PaceRun. Bem-vindo à jornada!',
+      type: 'achievement',
+    });
+  }
+
+  // Conquistas por distância
+  ACHIEVEMENTS.filter(a => a.threshold > 0).forEach(ach => {
+    if (totalDistance >= ach.threshold) {
+      addNotification({
+        id: ach.id,
+        emoji: ach.emoji,
+        title: ach.title,
+        desc: ach.desc,
+        type: 'achievement',
+      });
+    }
+  });
+}
+
+// Notificação de atividade de outro usuário (verifica periodicamente)
+async function checkCommunityNotifications() {
+  if (!State.user) return;
+  const { db, collection, query, orderBy, limit, getDocs, where } = window.__firebase;
+
+  try {
+    // Pega atividades recentes (última hora) de outros usuários
+    const oneHourAgo = new Date(Date.now() - 3600000);
+    const q = query(
+      collection(db, 'activities'),
+      where('userId', '!=', State.user.uid),
+      orderBy('userId'),
+      orderBy('timestamp', 'desc'),
+      limit(5)
+    );
+    const snap = await getDocs(q);
+    snap.forEach(d => {
+      const a = d.data();
+      const notifId = `community_${d.id}`;
+      const notifs = getStoredNotifications();
+      if (!notifs.find(n => n.id === notifId)) {
+        addNotification({
+          id: notifId,
+          emoji: a.type === 'running' ? '🏃' : '🚶',
+          title: `${a.userName} completou uma atividade!`,
+          desc: `${a.distance?.toFixed(2)} km em ${formatDuration(a.duration || 0)} · Ritmo ${a.pace}`,
+          type: 'community',
+        });
+      }
+    });
+  } catch (e) {
+    // Índice composto não disponível ainda — ignora silenciosamente
+  }
+}
+
+function formatTimeAgo(timestamp) {
+  if (!timestamp) return '';
+  const diff = Date.now() - timestamp;
+  const min = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (min < 1) return 'agora mesmo';
+  if (min < 60) return `há ${min} min`;
+  if (h < 24) return `há ${h}h`;
+  return `há ${d} dia${d > 1 ? 's' : ''}`;
 }
 
 // ── PWA Service Worker Registration ───────────────────────

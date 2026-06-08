@@ -765,3 +765,152 @@ html, body {
 .auth-step-icon {
   font-size: 40px; margin-bottom: 4px;
 }
+
+/* ── ACTIVITY PAGE v6 ────────────────────────────────────── */
+#page-activity {
+  display: flex !important;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.activity-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px 12px 8px;
+  flex-shrink: 0;
+}
+
+.activity-stats-grid .stat-card { padding: 12px 14px; }
+.activity-stats-grid .main-stat { grid-column: 1/-1; padding: 16px 18px; }
+.activity-stats-grid .stat-value { font-size: 36px; }
+.activity-stats-grid .main-stat .stat-value { font-size: 48px; }
+
+#page-activity .activity-map {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  border-radius: 0;
+  margin: 0;
+  border: none;
+  border-top: 0.5px solid var(--border);
+  position: relative;
+}
+
+/* Speed overlay no mapa */
+.speed-overlay {
+  position: absolute;
+  top: 12px; left: 12px;
+  display: flex; gap: 8px;
+  z-index: 10;
+}
+.speed-item-sm {
+  background: rgba(10,22,40,0.85);
+  border: 0.5px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+.speed-item-sm span {
+  font-family: var(--font-display);
+  font-size: 18px; font-weight: 700;
+  display: block; color: var(--white);
+}
+.speed-item-sm label { font-size: 10px; color: var(--text-muted); }
+
+/* ── CONTROLES FIXOS ─────────────────────────────────────── */
+.activity-controls-fixed {
+  position: fixed;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0) + 12px);
+  left: 50%; transform: translateX(-50%);
+  display: none; /* só mostra na aba de atividade */
+  align-items: center; gap: 20px;
+  z-index: 50;
+  background: rgba(10,22,40,0.9);
+  border: 0.5px solid rgba(255,255,255,0.12);
+  border-radius: 40px;
+  padding: 10px 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.activity-controls-fixed.visible { display: flex; }
+
+.activity-controls-fixed .ctrl-btn.primary {
+  width: 72px; height: 72px;
+}
+.activity-controls-fixed .ctrl-btn.secondary {
+  width: 52px; height: 52px;
+}
+
+/* ── NOTIFICAÇÕES ────────────────────────────────────────── */
+.notif-btn { position: relative; }
+.notif-badge {
+  position: absolute; top: -4px; right: -4px;
+  background: var(--red); color: white;
+  font-size: 10px; font-weight: 700;
+  min-width: 18px; height: 18px;
+  border-radius: 9px; padding: 0 4px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--blue-900);
+}
+
+.notif-item {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.notif-item:last-child { border-bottom: none; }
+.notif-icon {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+  background: var(--surface2);
+}
+.notif-icon.achievement { background: rgba(245,166,35,0.15); }
+.notif-icon.community { background: rgba(26,107,240,0.15); }
+.notif-body { flex: 1; }
+.notif-title { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.notif-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
+.notif-time { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.notif-item.unread .notif-title::before {
+  content: ''; display: inline-block;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--blue-400); margin-right: 6px;
+  vertical-align: middle;
+}
+
+.notif-empty {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-muted); font-size: 14px;
+}
+
+/* ── FEED — cards clicáveis e expandíveis ───────────────── */
+.news-card { cursor: pointer; }
+.news-card-full {
+  display: none;
+  padding: 0 16px 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  border-top: 0.5px solid var(--border);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.news-card.expanded .news-card-full { display: block; }
+.news-card-chevron {
+  float: right; transition: transform 0.2s ease;
+  color: var(--text-muted);
+}
+.news-card.expanded .news-card-chevron { transform: rotate(180deg); }
+
+/* ── COMUNIDADE v6 — exclui usuário atual ───────────────── */
+.community-activity-badge {
+  display: inline-block;
+  font-size: 11px; padding: 2px 8px;
+  border-radius: 4px; margin-top: 4px;
+  background: rgba(26,107,240,0.15);
+  color: var(--blue-300);
+}
