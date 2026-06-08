@@ -257,8 +257,7 @@ async function checkEmailLink() {
 
 // ── Finaliza cadastro com nome + senha ──────────────────
 async function completeRegistration() {
-  const { auth, db, updateProfile, doc, setDoc, serverTimestamp,
-          EmailAuthProvider, linkWithCredential } = window.__firebase;
+  const { auth, db, updateProfile, doc, setDoc, serverTimestamp } = window.__firebase;
 
   const name = document.getElementById('complete-name').value.trim();
   const pass1 = document.getElementById('complete-password').value;
@@ -275,27 +274,36 @@ async function completeRegistration() {
 
   try {
     const user = window._pendingUser || auth.currentUser;
-    if (!user) throw new Error('Sessão perdida. Tente novamente.');
-
-    // Atualiza displayName
-    await updateProfile(user, { displayName: name });
-
-    // Vincula e-mail + senha ao usuário criado via link
-    const credential = EmailAuthProvider.credential(
-      window._pendingEmail || user.email,
-      pass1
-    );
-    try {
-      await linkWithCredential(user, credential);
-    } catch (linkErr) {
-      // Se já tem senha vinculada (provider-already-linked), ignora
-      if (linkErr.code !== 'auth/provider-already-linked') throw linkErr;
+    if (!user) {
+      showError(errEl, 'Sessão expirada. Feche o app, clique no link do e-mail novamente e tente outra vez.');
+      btn.textContent = 'Criar minha conta';
+      btn.disabled = false;
+      return;
     }
 
-    // Cria perfil no Firestore
+    // 1. Atualiza o nome de exibição
+    await updateProfile(user, { displayName: name });
+
+    // 2. Define a senha usando updatePassword (funciona para usuários Email Link)
+    const { updatePassword } = window.__firebase;
+    try {
+      await updatePassword(user, pass1);
+    } catch (pwErr) {
+      // requires-recent-login: o token do email link já expirou
+      if (pwErr.code === 'auth/requires-recent-login') {
+        showError(errEl, 'Por segurança, o link expirou. Solicite um novo link de acesso.');
+        btn.textContent = 'Criar minha conta';
+        btn.disabled = false;
+        return;
+      }
+      // Outros erros de senha: loga mas não impede — o usuário pode definir senha depois
+      console.warn('updatePassword warning:', pwErr.code);
+    }
+
+    // 3. Cria o perfil no Firestore
     await setDoc(doc(db, 'users', user.uid), {
       name,
-      email: window._pendingEmail || user.email,
+      email: user.email || window._pendingEmail || '',
       weight: 70,
       photoURL: '',
       totalRuns: 0,
@@ -304,15 +312,32 @@ async function completeRegistration() {
       createdAt: serverTimestamp(),
     });
 
+    // 4. Limpa estado temporário
     window._pendingUser = null;
     window._pendingEmail = null;
 
+    // 5. Atualiza perfil local e abre o app
+    State.userProfile = { name, weight: 70, totalRuns: 0, totalDistance: 0, totalDuration: 0, photoURL: '' };
+    updateHeaderUI();
+
     showToast('🎉 Bem-vindo ao PaceRun, ' + name.split(' ')[0] + '!');
-    // onAuthStateChanged vai detectar e abrir o app automaticamente
+
+    // Esconde auth e abre o app manualmente (não espera onAuthStateChanged)
+    document.getElementById('auth-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    if (!_appSetupDone) {
+      _appSetupDone = true;
+      setupApp();
+    }
 
   } catch (e) {
-    console.error(e);
-    showError(errEl, e.message || 'Erro ao criar conta. Tente novamente.');
+    console.error('completeRegistration error:', e.code, e.message);
+    const msg = e.code === 'permission-denied'
+      ? 'Permissão negada no Firestore. Verifique as regras.'
+      : e.code === 'auth/weak-password'
+      ? 'Senha muito fraca. Use pelo menos 6 caracteres.'
+      : `Erro: ${e.message || e.code}`;
+    showError(errEl, msg);
     btn.textContent = 'Criar minha conta';
     btn.disabled = false;
   }

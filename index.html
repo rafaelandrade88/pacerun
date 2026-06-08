@@ -20,9 +20,9 @@
   <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    
+   
     const firebaseConfig = {
   apiKey: "AIzaSyAMVtjO77iIzb8RxuZ4vUNgljxFATD6P1k",
   authDomain: "pacerun-16dda.firebaseapp.com",
@@ -30,13 +30,13 @@
   storageBucket: "pacerun-16dda.firebasestorage.app",
   messagingSenderId: "637460926424",
   appId: "1:637460926424:web:0dfddfb2e7b2fa406a2cad"
-    };
-    
+};
+
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    window.__firebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp };
+    window.__firebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp };
 
     window.dispatchEvent(new Event('firebase-ready'));
   </script>
