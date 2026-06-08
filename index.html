@@ -27,6 +27,10 @@
     import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     // Firebase Storage removido — usando Cloudinary (gratuito, sem cartão)
 
+    // ── CONFIGURE YOUR FIREBASE PROJECT HERE ──────────────────────────────
+    // 1. Acesse https://console.firebase.google.com
+    // 2. Crie um projeto e clique em "Adicionar app Web"
+    // 3. Substitua os valores abaixo pelos do seu projeto
     const firebaseConfig = {
       apiKey: "AIzaSyAMVtjO77iIzb8RxuZ4vUNgljxFATD6P1k",
       authDomain: "pacerun-16dda.firebaseapp.com",
@@ -35,6 +39,7 @@
       messagingSenderId: "637460926424",
       appId: "1:637460926424:web:0dfddfb2e7b2fa406a2cad"
     };
+    // ── FIM DA CONFIGURAÇÃO ────────────────────────────────────────────────
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -240,8 +245,19 @@
       <!-- ── PAGE: FEED ── -->
       <section id="page-feed" class="page">
         <div class="page-header">
-          <h2>Feed</h2>
-          <p id="feed-location-label">Carregando localização...</p>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <h2>Feed</h2>
+              <p id="feed-location-label">Carregando localização...</p>
+            </div>
+            <button class="btn-races" id="btn-open-races">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 11l19-9-9 19-2-8-8-2z" />
+              </svg>
+              Próximas<br>Corridas
+            </button>
+          </div>
         </div>
         <div id="feed-loading" class="feed-loading">
           <div class="skeleton-card"></div>
@@ -404,6 +420,57 @@
         <rect x="3" y="3" width="18" height="18" rx="2" />
       </svg>
     </button>
+  </div>
+
+  <!-- Modal Próximas Corridas -->
+  <div id="modal-races" class="modal-overlay hidden">
+    <div class="modal-sheet modal-sheet-tall">
+      <div class="modal-handle"></div>
+      <div class="races-header">
+        <div>
+          <h2 class="modal-title" style="margin-bottom:4px">🏁 Próximas Corridas</h2>
+          <p style="font-size:13px;color:var(--text-secondary)">Eventos de corrida e caminhada</p>
+        </div>
+        <button class="btn-ghost" id="btn-close-races" style="padding:8px">✕</button>
+      </div>
+
+      <!-- Seletor de cidade -->
+      <div class="races-city-selector">
+        <div class="races-search-bar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input type="text" id="races-city-input" placeholder="Digite a cidade (ex: Guarulhos, São Paulo...)" />
+          <button id="btn-search-races" class="races-search-btn">
+            Buscar
+          </button>
+        </div>
+        <!-- Cidades rápidas -->
+        <div class="races-quick-cities">
+          <button class="city-chip" data-city="Guarulhos">Guarulhos</button>
+          <button class="city-chip" data-city="São Paulo">São Paulo</button>
+          <button class="city-chip" data-city="Campinas">Campinas</button>
+          <button class="city-chip" data-city="Rio de Janeiro">Rio de Janeiro</button>
+          <button class="city-chip" data-city="Belo Horizonte">BH</button>
+          <button class="city-chip" data-city="Curitiba">Curitiba</button>
+        </div>
+      </div>
+
+      <!-- Resultados -->
+      <div id="races-loading" class="races-loading hidden">
+        <div class="races-spinner"></div>
+        <p>Buscando corridas em <span id="races-loading-city"></span>...</p>
+      </div>
+
+      <div id="races-empty" class="races-empty hidden">
+        <div style="font-size:48px;margin-bottom:12px">🔍</div>
+        <p>Selecione uma cidade para ver<br>as próximas corridas</p>
+      </div>
+
+      <div id="races-list" class="races-list"></div>
+    </div>
   </div>
 
   <!-- Modal Notificações -->

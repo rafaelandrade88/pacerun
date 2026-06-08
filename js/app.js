@@ -370,11 +370,11 @@ function setupApp() {
   setupActivityPage();
   setupProfilePage();
   setupNotifications();
+  setupRaces();
   navigateTo('activity');
   loadFeed();
   loadRanking('distance');
   loadProfileData();
-  // Verifica notificações da comunidade com delay
   setTimeout(checkCommunityNotifications, 3000);
 }
 
@@ -1703,6 +1703,215 @@ function formatTimeAgo(ts) {
   if (m < 60) return `há ${m} min`;
   if (h < 24) return `há ${h}h`;
   return `há ${d} dia${d > 1 ? 's' : ''}`;
+}
+
+// ════════════════════════════════════════════════════════
+// PRÓXIMAS CORRIDAS
+// ════════════════════════════════════════════════════════
+
+function setupRaces() {
+  document.getElementById('btn-open-races')?.addEventListener('click', () => {
+    document.getElementById('modal-races').classList.remove('hidden');
+    document.getElementById('races-empty').classList.remove('hidden');
+    document.getElementById('races-list').innerHTML = '';
+  });
+
+  document.getElementById('btn-close-races')?.addEventListener('click', () => {
+    document.getElementById('modal-races').classList.add('hidden');
+  });
+
+  document.getElementById('btn-search-races')?.addEventListener('click', () => {
+    const city = document.getElementById('races-city-input').value.trim();
+    if (city) searchRaces(city);
+  });
+
+  document.getElementById('races-city-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const city = e.target.value.trim();
+      if (city) searchRaces(city);
+    }
+  });
+
+  // Chips de cidades rápidas
+  document.querySelectorAll('.city-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.city-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      document.getElementById('races-city-input').value = chip.dataset.city;
+      searchRaces(chip.dataset.city);
+    });
+  });
+}
+
+async function searchRaces(city) {
+  const loadingEl = document.getElementById('races-loading');
+  const emptyEl   = document.getElementById('races-empty');
+  const listEl    = document.getElementById('races-list');
+
+  // Mostra loading
+  emptyEl.classList.add('hidden');
+  listEl.innerHTML = '';
+  loadingEl.classList.remove('hidden');
+  document.getElementById('races-loading-city').textContent = city;
+
+  // Cache por cidade + dia (evita chamar IA toda vez)
+  const cacheKey = `pacerun_races_${city.toLowerCase().replace(/\s/g,'_')}`;
+  const cacheTs  = `${cacheKey}_ts`;
+  const cached   = localStorage.getItem(cacheKey);
+  const cachedAt = parseInt(localStorage.getItem(cacheTs) || '0');
+  const twelveHours = 12 * 60 * 60 * 1000;
+
+  if (cached && (Date.now() - cachedAt < twelveHours)) {
+    try {
+      renderRaces(JSON.parse(cached), city);
+      loadingEl.classList.add('hidden');
+      return;
+    } catch { /* cache inválido */ }
+  }
+
+  const today = new Date().toLocaleDateString('pt-BR');
+  const year  = new Date().getFullYear();
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{
+          role: 'user',
+          content: `Pesquise na internet as PRÓXIMAS corridas de rua, caminhadas e eventos esportivos em ${city}, Brasil, a partir de hoje ${today} (${year}).
+
+Busque em sites como: corridasderua.com.br, corridabrasil.com.br, resultados.com.br, ticket.com.br e outros.
+
+Retorne APENAS JSON válido sem markdown:
+{
+  "city": "${city}",
+  "races": [
+    {
+      "name": "Nome oficial da corrida",
+      "date": "DD/MM/YYYY",
+      "day": "DD",
+      "month": "MMM",
+      "distances": ["5km", "10km"],
+      "type": "Corrida de Rua",
+      "location": "Local ou bairro específico",
+      "description": "Breve descrição do evento em 1-2 frases",
+      "link": "https://url-oficial-do-evento.com.br ou null se não encontrar",
+      "confirmed": true
+    }
+  ]
+}
+
+Ordene por data crescente. Inclua somente eventos FUTUROS a partir de ${today}.
+Se não encontrar eventos confirmados, inclua eventos prováveis com confirmed: false.
+Retorne no mínimo 3 e no máximo 10 eventos.`
+        }]
+      })
+    });
+
+    const data = await response.json();
+
+    // Extrai o texto da resposta (pode ter tool_use intermediário)
+    let text = '';
+    if (data.content) {
+      for (const block of data.content) {
+        if (block.type === 'text') text += block.text;
+      }
+    }
+
+    const clean = text.replace(/```json[\s\S]*?```/g, t => t.slice(7, -3)).replace(/```/g, '').trim();
+
+    // Tenta parsear JSON da resposta
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('JSON não encontrado na resposta');
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    const races = parsed.races || [];
+
+    // Salva cache
+    localStorage.setItem(cacheKey, JSON.stringify(races));
+    localStorage.setItem(cacheTs, Date.now().toString());
+
+    renderRaces(races, city);
+
+  } catch (e) {
+    console.error('searchRaces error:', e);
+    // Fallback informativo
+    renderRaces([{
+      name: `Corridas em ${city} — Resultado indisponível`,
+      date: '',
+      day: '--',
+      month: '---',
+      distances: [],
+      type: 'Busca',
+      location: city,
+      description: 'Não foi possível buscar eventos no momento. Tente pesquisar diretamente em corridasderua.com.br',
+      link: `https://www.corridasderua.com.br/busca?q=${encodeURIComponent(city)}`,
+      confirmed: false,
+    }], city);
+  }
+
+  loadingEl.classList.add('hidden');
+}
+
+function renderRaces(races, city) {
+  const listEl = document.getElementById('races-list');
+
+  if (!races || races.length === 0) {
+    listEl.innerHTML = `
+      <div class="races-empty" style="display:block">
+        <div style="font-size:48px;margin-bottom:12px">😔</div>
+        <p>Nenhuma corrida encontrada em <strong>${city}</strong>.<br>Tente uma cidade próxima.</p>
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = races.map(r => {
+    const distTags = (r.distances || []).map(d =>
+      `<span class="race-tag dist">${d}</span>`
+    ).join('');
+
+    const linkEl = r.link && r.link !== 'null'
+      ? `<a href="${r.link}" target="_blank" rel="noopener noreferrer" class="race-link">
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+           Ver inscrições
+         </a>`
+      : `<p class="race-no-link">🔍 Pesquise o nome do evento para se inscrever</p>`;
+
+    const unconfirmedBadge = !r.confirmed
+      ? `<span class="race-tag type" style="background:rgba(255,77,77,0.1);color:#FF8080">Não confirmado</span>`
+      : '';
+
+    return `
+      <div class="race-card">
+        <div class="race-card-top">
+          <div class="race-date-badge">
+            <div class="day">${r.day || '--'}</div>
+            <div class="month">${r.month || '---'}</div>
+          </div>
+          <div class="race-info">
+            <div class="race-name">${r.name}</div>
+            <div class="race-meta">
+              ${distTags}
+              ${r.type ? `<span class="race-tag type">${r.type}</span>` : ''}
+              ${r.location ? `<span class="race-tag city">📍 ${r.location}</span>` : ''}
+              ${unconfirmedBadge}
+            </div>
+          </div>
+        </div>
+        ${r.description ? `<p class="race-desc">${r.description}</p>` : ''}
+        ${linkEl}
+      </div>`;
+  }).join('');
+
+  // Disclaimer sobre dados da IA
+  listEl.innerHTML += `
+    <div class="races-disclaimer">
+      ⚠️ Informações geradas por IA. Confirme datas e inscrições nos sites oficiais.
+    </div>`;
 }
 
 // ── PWA Service Worker Registration ───────────────────────
