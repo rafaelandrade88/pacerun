@@ -409,17 +409,17 @@ function setupNav() {
 function navigateTo(page) {
   State.currentPage = page;
 
-  // Esconde TODAS as páginas de forma uniforme
+  // Esconde todas as páginas limpando active e hidden
   document.querySelectorAll('.page').forEach(p => {
-    p.classList.remove('active');
-    p.style.display = '';   // limpa qualquer inline style anterior
+    p.classList.remove('active', 'hidden');
     p.style.removeProperty('display');
   });
 
-  // Mostra só a página alvo via classe (o CSS cuida do display)
+  // Ativa a página alvo
   const target = document.getElementById('page-' + page);
   if (target) {
     target.classList.add('active');
+    target.style.removeProperty('display');
   }
 
   // Controles fixos de atividade
@@ -438,11 +438,11 @@ function navigateTo(page) {
   }
 
   // Carrega dados
-  if (page === 'progress') loadProgress();
-  if (page === 'ranking') loadRanking(document.querySelector('.ranking-tab.active')?.dataset.rank || 'distance');
+  if (page === 'progress')  loadProgress();
+  if (page === 'ranking')   loadRanking(document.querySelector('.ranking-tab.active')?.dataset.rank || 'distance');
   if (page === 'community') loadCommunity();
-  if (page === 'feed') refreshFeedIfNeeded();
-  if (page === 'profile') loadProfileData();
+  if (page === 'feed')      refreshFeedIfNeeded();
+  if (page === 'profile')   loadProfileData();
 }
 
 // ════════════════════════════════════════════════════════

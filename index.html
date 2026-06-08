@@ -25,6 +25,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    // Firebase Storage removido — usando Cloudinary (gratuito, sem cartão)
 
     const firebaseConfig = {
       apiKey: "AIzaSyAMVtjO77iIzb8RxuZ4vUNgljxFATD6P1k",
@@ -237,7 +238,7 @@
       </section>
 
       <!-- ── PAGE: FEED ── -->
-      <section id="page-feed" class="page hidden">
+      <section id="page-feed" class="page">
         <div class="page-header">
           <h2>Feed</h2>
           <p id="feed-location-label">Carregando localização...</p>
@@ -251,7 +252,7 @@
       </section>
 
       <!-- ── PAGE: COMUNIDADE ── -->
-      <section id="page-community" class="page hidden">
+      <section id="page-community" class="page">
         <div class="page-header">
           <h2>Comunidade</h2>
           <p>Encontre outros corredores</p>
@@ -268,7 +269,7 @@
       </section>
 
       <!-- ── PAGE: RANKING ── -->
-      <section id="page-ranking" class="page hidden">
+      <section id="page-ranking" class="page">
         <div class="page-header">
           <h2>Ranking</h2>
           <p>Os melhores da semana</p>
@@ -281,7 +282,7 @@
       </section>
 
       <!-- ── PAGE: PROGRESSO ── -->
-      <section id="page-progress" class="page hidden">
+      <section id="page-progress" class="page">
         <div class="page-header">
           <h2>Progresso</h2>
           <p>Seu histórico completo</p>
@@ -291,7 +292,7 @@
       </section>
 
       <!-- ── PAGE: PERFIL ── -->
-      <section id="page-profile" class="page hidden">
+      <section id="page-profile" class="page">
         <div class="profile-header">
           <div class="profile-avatar-wrapper">
             <img id="profile-avatar" src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=128"
