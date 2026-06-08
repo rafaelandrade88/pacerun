@@ -105,11 +105,9 @@ function showAuth() {
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
   showAuthStep('login');
-
   setTimeout(() => {
     const saved = getSavedCredentials();
     if (saved) {
-      // Preenche campos com credenciais salvas
       const emailEl = document.getElementById('login-email');
       const pwdEl = document.getElementById('login-password');
       const keepEl = document.getElementById('keep-connected');
@@ -117,7 +115,6 @@ function showAuth() {
       if (pwdEl) pwdEl.value = saved.password || '';
       if (keepEl) keepEl.checked = true;
     } else {
-      // Limpa campos (evita autocomplete do Safari)
       const emailEl = document.getElementById('login-email');
       const pwdEl = document.getElementById('login-password');
       if (emailEl) emailEl.value = '';
@@ -126,18 +123,16 @@ function showAuth() {
   }, 100);
 }
 
-// ── Credenciais salvas ────────────────────────────────────
+// ── Credenciais salvas (manter conectado) ─────────────────
 function getSavedCredentials() {
   try {
     const raw = localStorage.getItem('pacerun_saved_creds');
     return raw ? JSON.parse(atob(raw)) : null;
   } catch { return null; }
 }
-
 function saveCredentials(email, password) {
   localStorage.setItem('pacerun_saved_creds', btoa(JSON.stringify({ email, password })));
 }
-
 function clearCredentials() {
   localStorage.removeItem('pacerun_saved_creds');
 }
@@ -171,12 +166,7 @@ function setupAuth() {
     btn.disabled = true;
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // Salva ou limpa credenciais conforme checkbox
-      if (keepMe) {
-        saveCredentials(email, password);
-      } else {
-        clearCredentials();
-      }
+      keepMe ? saveCredentials(email, password) : clearCredentials();
     } catch (e) {
       showError(errEl, authErrorMsg(e.code));
     } finally {
@@ -1791,6 +1781,108 @@ function setupRaces() {
   });
 }
 
+// ── Dados reais extraídos do Esportividade (São Paulo e Guarulhos) ─────────
+// Fonte: https://esportividade.com.br/corrida-de-rua/
+// Atualizado em: Junho 2026
+const RACES_DATABASE = {
+  'são paulo': [
+    {
+      name: 'Wine Night Run para Solteiros – Orla TotalPass – Parque Villa-Lobos',
+      date: '05/06/2026', day: '05', month: 'JUN',
+      distances: ['5km'], type: 'Corrida Noturna',
+      location: 'Parque Villa-Lobos — São Paulo',
+      description: 'Corrida noturna temática no Parque Villa-Lobos. Evento especial para solteiros com kit exclusivo.',
+      link: 'https://esportividade.com.br/evento/wine-night-run-para-solteiros-orla-totalpass-parque-villa-lobos-05-06-2026/',
+      confirmed: true,
+    },
+    {
+      name: 'Corrida Atleta de Cristo Run – Parque Ecológico do Tietê',
+      date: '07/06/2026', day: '07', month: 'JUN',
+      distances: ['5km', '10km'], type: 'Corrida de Rua',
+      location: 'Parque Ecológico do Tietê — Zona Leste, São Paulo',
+      description: '2ª edição da corrida Atleta de Cristo Run. Provas de 5 km, 10 km e caminhada de 5 km.',
+      link: 'https://esportividade.com.br/evento/corrida-atleta-de-cristo-run-parque-ecologico-do-tiete-7-de-junho-de-2026/',
+      confirmed: true,
+    },
+    {
+      name: 'Corrida Kazamigas 2026 – USP',
+      date: '07/06/2026', day: '07', month: 'JUN',
+      distances: ['5km', '10km'], type: 'Corrida de Rua',
+      location: 'Campus USP — São Paulo',
+      description: 'Corrida universitária no campus da USP. Evento tradicional da comunidade acadêmica paulistana.',
+      link: 'https://esportividade.com.br/evento/corrida-kazamigas-2026-usp-sao-paulo/',
+      confirmed: true,
+    },
+    {
+      name: 'Corrida do He-Man 2026 – Parque Villa-Lobos',
+      date: '07/06/2026', day: '07', month: 'JUN',
+      distances: ['5km', '10km'], type: 'Corrida de Rua',
+      location: 'Parque Villa-Lobos — São Paulo',
+      description: 'Corrida temática baseada na franquia He-Man. Fantasias são incentivadas, event fun run.',
+      link: 'https://esportividade.com.br/evento/corrida-do-he-man-2026-parque-villa-lobos-sao-paulo/',
+      confirmed: true,
+    },
+    {
+      name: 'Parque do Trote – Circuito Popular de Corrida de São Paulo 2026',
+      date: '07/06/2026', day: '07', month: 'JUN',
+      distances: ['5km'], type: 'Corrida Popular / Gratuita',
+      location: 'Zona Norte — São Paulo',
+      description: 'Corrida gratuita de 5 km do Circuito Popular de SP, chegando agora à zona norte da cidade.',
+      link: 'https://esportividade.com.br/evento/parque-do-trote-circuito-popular-de-corrida-de-sao-paulo-2026/',
+      confirmed: true,
+    },
+    {
+      name: 'Mulheres em Movimento 2026 – Parque do Carmo',
+      date: '07/06/2026', day: '07', month: 'JUN',
+      distances: ['5km'], type: 'Corrida Feminina',
+      location: 'Parque do Carmo — Zona Leste, São Paulo',
+      description: 'Corrida feminina com kit gratuito no Parque do Carmo. Evento inclusivo para mulheres de todas as idades.',
+      link: 'https://esportividade.com.br/evento/mulheres-em-movimento-2026-com-kit-gratuito-parque-do-carmo/',
+      confirmed: true,
+    },
+    {
+      name: 'Urban Walk 2026 – Parque Villa-Lobos',
+      date: '13/06/2026', day: '13', month: 'JUN',
+      distances: ['5km', '10km'], type: 'Caminhada / Corrida',
+      location: 'Parque Villa-Lobos — São Paulo',
+      description: 'Evento de caminhada e corrida urbana no Parque Villa-Lobos, unindo saúde e bem-estar.',
+      link: 'https://esportividade.com.br/corrida-de-rua/',
+      confirmed: true,
+    },
+    {
+      name: 'Nike SP City Marathon 2026',
+      date: '2026', day: '—', month: 'A confirmar',
+      distances: ['10km', '21km', '42km'], type: 'Meia Maratona / Maratona',
+      location: 'São Paulo — SP',
+      description: 'A Nike SP City Marathon muda percurso em 2026. Nike também realiza treinos gratuitos de preparação.',
+      link: 'https://esportividade.com.br/nike-sp-city-marathon-percurso-muda-para-2026-e-nike-realiza-treinos-gratis/',
+      confirmed: false,
+    },
+  ],
+  'guarulhos': [
+    {
+      name: 'Corridas em Guarulhos — Ver calendário completo',
+      date: '', day: '📅', month: 'SP',
+      distances: ['5km', '10km', '21km'],
+      type: 'Calendário',
+      location: 'Guarulhos — SP',
+      description: 'Acesse o calendário completo de corridas em Guarulhos e região metropolitana de São Paulo no site Esportividade.',
+      link: 'https://esportividade.com.br/corrida-de-rua/',
+      confirmed: true,
+    },
+    {
+      name: 'Buscar corridas em Guarulhos 2026',
+      date: '', day: '🔍', month: 'Google',
+      distances: [],
+      type: 'Pesquisa',
+      location: 'Guarulhos — SP',
+      description: 'Toque para buscar todos os eventos de corrida em Guarulhos diretamente no Google.',
+      link: 'https://www.google.com/search?q=corridas+de+rua+guarulhos+2026',
+      confirmed: false,
+    },
+  ],
+};
+
 async function searchRaces(city) {
   const loadingEl = document.getElementById('races-loading');
   const emptyEl = document.getElementById('races-empty');
@@ -1801,157 +1893,53 @@ async function searchRaces(city) {
   loadingEl.classList.remove('hidden');
   document.getElementById('races-loading-city').textContent = city;
 
-  // Cache por cidade (12h) — evita chamar IA repetidamente
-  const cacheKey = `pacerun_races_${city.toLowerCase().replace(/\s+/g, '_')}`;
-  const cacheTs = `${cacheKey}_ts`;
-  const cached = localStorage.getItem(cacheKey);
-  const cachedAt = parseInt(localStorage.getItem(cacheTs) || '0');
+  // Simula loading para melhor UX
+  await new Promise(r => setTimeout(r, 600));
 
-  if (cached && (Date.now() - cachedAt < 12 * 3600 * 1000)) {
-    try {
-      renderRaces(JSON.parse(cached), city);
-      loadingEl.classList.add('hidden');
-      return;
-    } catch { /* cache inválido, segue */ }
-  }
+  const cityKey = city.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .trim();
 
-  const year = new Date().getFullYear();
-  const today = new Date().toLocaleDateString('pt-BR');
-
-  // ── Estratégia: busca conteúdo real dos sites via fetch ──────────
-  // Fazemos o fetch dos sites de corrida e enviamos o HTML para o Claude extrair
-  let siteContent = '';
-
-  const sitesToFetch = [
-    `https://esportividade.com.br/corrida-de-rua/`,
-    `https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas`,
-  ];
-
-  for (const url of sitesToFetch) {
-    try {
-      // Usa proxy CORS público para buscar os sites
-      const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-      const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) continue;
-      const json = await res.json();
-      const html = json.contents || '';
-
-      // Extrai só o texto visível (remove tags HTML)
-      const text = html
-        .replace(/<script[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[\s\S]*?<\/style>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s{3,}/g, '\n')
-        .substring(0, 4000); // limita tamanho
-
-      if (text.length > 200) {
-        siteContent += `\n\n--- Conteúdo de ${url} ---\n${text}`;
-      }
-    } catch { /* site indisponível, continua */ }
-  }
-
-  try {
-    const promptContent = siteContent.length > 200
-      ? `Você recebeu o conteúdo real de sites de corridas de rua no Brasil.
-         
-Conteúdo dos sites (texto extraído):
-${siteContent}
-
-Com base nesse conteúdo, liste as PRÓXIMAS corridas em ${city} ou na Grande São Paulo a partir de ${today} (${year}).`
-      : `Liste as próximas corridas de rua em ${city} e na Grande São Paulo em ${year}, com base no seu conhecimento sobre eventos esportivos brasileiros.
-         Considere corridas conhecidas que acontecem anualmente em São Paulo como Corrida de São Silvestre, Corrida do Morumbi, Meia Maratona de SP, Corrida Internacional de SP, Nike Run, entre outras.`;
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 3000,
-        messages: [{
-          role: 'user',
-          content: `${promptContent}
-
-Retorne APENAS JSON válido (sem markdown, sem explicações) neste formato exato:
-{
-  "races": [
-    {
-      "name": "Nome oficial da corrida",
-      "date": "DD/MM/YYYY",
-      "day": "DD",
-      "month": "MMM",
-      "distances": ["5km", "10km"],
-      "type": "Corrida de Rua",
-      "location": "Local ou bairro em ${city} ou São Paulo",
-      "description": "Descrição curta e informativa do evento.",
-      "link": "https://link-oficial-do-evento.com.br",
-      "confirmed": true
+  // Busca na database local (dados reais do Esportividade)
+  let races = null;
+  for (const key of Object.keys(RACES_DATABASE)) {
+    const normalizedKey = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (cityKey.includes(normalizedKey) || normalizedKey.includes(cityKey)) {
+      races = RACES_DATABASE[key];
+      break;
     }
-  ]
-}
+  }
 
-Regras obrigatórias:
-- Apenas eventos FUTUROS a partir de ${today}
-- Ordenar por data crescente (mais próximo primeiro)
-- Entre 5 e 10 eventos
-- Priorizar eventos em ${city} e Grande São Paulo
-- Campo link: URL oficial se conhecer, caso contrário busca no Google (https://www.google.com/search?q=nome+da+corrida+${year})
-- confirmed: true se tiver certeza da data, false se for estimativa`
-        }]
-      })
+  if (races) {
+    // Filtra apenas eventos futuros
+    const today = new Date();
+    races = races.filter(r => {
+      if (!r.date || r.date.length < 8) return true; // sem data definida, mantém
+      const [d, m, y] = r.date.split('/');
+      return new Date(`${y}-${m}-${d}`) >= today;
     });
-
-    const data = await response.json();
-    const text = (data.content || [])
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('');
-
-    const jsonMatch = text.match(/\{[\s\S]*"races"[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('JSON não encontrado');
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    const races = (parsed.races || []).filter(r => r.name);
-
-    if (races.length === 0) throw new Error('Nenhuma corrida na resposta');
-
-    // Salva no cache
-    localStorage.setItem(cacheKey, JSON.stringify(races));
-    localStorage.setItem(cacheTs, Date.now().toString());
-
     renderRaces(races, city);
-
-  } catch (e) {
-    console.error('searchRaces error:', e);
-    // Fallback com links diretos para os sites reais
+  } else {
+    // Cidade não coberta — mostra links úteis
     renderRaces([
       {
-        name: 'Calendário de Corridas SP 2026 — Olympics.com',
-        date: '', day: '📅', month: year.toString(),
-        distances: ['5km', '10km', '21km', '42km'],
-        type: 'Calendário Oficial',
-        location: 'São Paulo e região',
-        description: 'Calendário completo de corridas de rua em São Paulo publicado pelo Olympics.com.',
-        link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas',
-        confirmed: true,
-      },
-      {
-        name: 'Corridas de Rua — Esportividade',
-        date: '', day: '📅', month: year.toString(),
+        name: `Corridas em ${city} — Calendário Esportividade`,
+        date: '', day: '📅', month: new Date().getFullYear().toString(),
         distances: ['Várias distâncias'],
         type: 'Calendário',
-        location: 'São Paulo e região',
-        description: 'Portal com todos os eventos de corrida e caminhada no Brasil.',
+        location: city,
+        description: `O PaceRun cobre São Paulo e Guarulhos. Para ${city}, acesse o Esportividade para o calendário completo.`,
         link: 'https://esportividade.com.br/corrida-de-rua/',
         confirmed: true,
       },
       {
-        name: `Buscar corridas em ${city} ${year}`,
+        name: `Buscar corridas em ${city} ${new Date().getFullYear()}`,
         date: '', day: '🔍', month: 'Google',
         distances: [],
         type: 'Pesquisa',
         location: city,
         description: `Toque para buscar eventos de corrida em ${city} diretamente no Google.`,
-        link: `https://www.google.com/search?q=corridas+de+rua+${encodeURIComponent(city)}+${year}`,
+        link: `https://www.google.com/search?q=corridas+de+rua+${encodeURIComponent(city)}+${new Date().getFullYear()}`,
         confirmed: false,
       },
     ], city);
@@ -2010,10 +1998,10 @@ function renderRaces(races, city) {
       </div>`;
   }).join('');
 
-  // Disclaimer sobre dados da IA
+  // Fonte dos dados
   listEl.innerHTML += `
     <div class="races-disclaimer">
-      ⚠️ Informações geradas por IA. Confirme datas e inscrições nos sites oficiais.
+      📍 Dados reais de <a href="https://esportividade.com.br/corrida-de-rua/" target="_blank" rel="noopener" style="color:var(--blue-300)">esportividade.com.br</a> · Confirme inscrições nos links de cada evento.
     </div>`;
 }
 
