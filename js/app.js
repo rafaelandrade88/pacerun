@@ -105,13 +105,41 @@ function showAuth() {
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
   showAuthStep('login');
-  // Limpa campos para evitar autocomplete do Safari preencher automaticamente
+
   setTimeout(() => {
-    const pwd = document.getElementById('login-password');
-    if (pwd) pwd.value = '';
-    const email = document.getElementById('login-email');
-    if (email) email.value = '';
+    const saved = getSavedCredentials();
+    if (saved) {
+      // Preenche campos com credenciais salvas
+      const emailEl = document.getElementById('login-email');
+      const pwdEl = document.getElementById('login-password');
+      const keepEl = document.getElementById('keep-connected');
+      if (emailEl) emailEl.value = saved.email || '';
+      if (pwdEl) pwdEl.value = saved.password || '';
+      if (keepEl) keepEl.checked = true;
+    } else {
+      // Limpa campos (evita autocomplete do Safari)
+      const emailEl = document.getElementById('login-email');
+      const pwdEl = document.getElementById('login-password');
+      if (emailEl) emailEl.value = '';
+      if (pwdEl) pwdEl.value = '';
+    }
   }, 100);
+}
+
+// ── Credenciais salvas ────────────────────────────────────
+function getSavedCredentials() {
+  try {
+    const raw = localStorage.getItem('pacerun_saved_creds');
+    return raw ? JSON.parse(atob(raw)) : null;
+  } catch { return null; }
+}
+
+function saveCredentials(email, password) {
+  localStorage.setItem('pacerun_saved_creds', btoa(JSON.stringify({ email, password })));
+}
+
+function clearCredentials() {
+  localStorage.removeItem('pacerun_saved_creds');
 }
 
 function showApp() {
@@ -133,6 +161,7 @@ function setupAuth() {
     const { auth, signInWithEmailAndPassword } = window.__firebase;
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
+    const keepMe = document.getElementById('keep-connected')?.checked || false;
     const errEl = document.getElementById('login-error');
     const btn = document.getElementById('btn-login');
 
@@ -142,6 +171,12 @@ function setupAuth() {
     btn.disabled = true;
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // Salva ou limpa credenciais conforme checkbox
+      if (keepMe) {
+        saveCredentials(email, password);
+      } else {
+        clearCredentials();
+      }
     } catch (e) {
       showError(errEl, authErrorMsg(e.code));
     } finally {
