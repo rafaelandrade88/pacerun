@@ -3,13 +3,13 @@
    Cache estratégico para funcionamento offline
    ═══════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'pacerun-v1';
+const CACHE_NAME = 'pacerun-v2';
 const PRECACHE = [
-  '/',
-  '/index.html',
-  '/css/app.css',
-  '/js/app.js',
-  '/manifest.json',
+  '/pacerun/',
+  '/pacerun/index.html',
+  '/pacerun/css/app.css',
+  '/pacerun/js/app.js',
+  '/pacerun/manifest.json',
 ];
 
 // Install: pre-cache assets

@@ -101,30 +101,25 @@ Vá em **Firestore → Indexes → Composite** e crie:
 
 Ou simplesmente execute o app — o Firestore vai sugerir os índices automaticamente com um link direto no console do browser.
 
-#### Storage (para fotos de perfil e atividades)
-1. Firebase Console → Storage → Começar
-2. Modo segurança: Produção
-3. Localização: `southamerica-east1`
+#### Storage de Fotos — Cloudinary (gratuito, sem cartão)
 
-4. Regras — cole em **Rules**:
-```
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /avatars/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId
-                   && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-    }
-    match /activities/{userId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId
-                   && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
-    }
-  }
-}
+Firebase Storage requer plano pago. O PaceRun usa **Cloudinary** no lugar — 25GB grátis, sem cartão de crédito.
+
+**Passo 1** — Crie conta gratuita em https://cloudinary.com (sem cartão)
+
+**Passo 2** — No dashboard, copie o seu **Cloud Name** (ex: `dxyz1234`)
+
+**Passo 3** — Crie um Upload Preset:
+- Settings → Upload → Upload Presets → **Add upload preset**
+- Signing Mode: `Unsigned`
+- Preset name: `pacerun_unsigned`
+- Folder: `pacerun`
+- Salvar
+
+**Passo 4** — Cole no `js/app.js` (duas ocorrências — avatar e foto de atividade):
+```javascript
+const CLOUD_NAME    = 'dxyz1234';         // ← seu Cloud Name
+const UPLOAD_PRESET = 'pacerun_unsigned'; // ← nome do preset criado
 ```
 
 ---

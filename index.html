@@ -20,26 +20,28 @@
   <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+    // Firebase Storage removido — usando Cloudinary (gratuito, sem cartão)
 
-    
+    // ── CONFIGURE YOUR FIREBASE PROJECT HERE ──────────────────────────────
+    // 1. Acesse https://console.firebase.google.com
+    // 2. Crie um projeto e clique em "Adicionar app Web"
+    // 3. Substitua os valores abaixo pelos do seu projeto
     const firebaseConfig = {
-  apiKey: "AIzaSyAMVtjO77iIzb8RxuZ4vUNgljxFATD6P1k",
-  authDomain: "pacerun-16dda.firebaseapp.com",
-  projectId: "pacerun-16dda",
-  storageBucket: "pacerun-16dda.firebasestorage.app",
-  messagingSenderId: "637460926424",
-  appId: "1:637460926424:web:0dfddfb2e7b2fa406a2cad"
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "", // não utilizado — usando Cloudinary para fotos
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
     };
-    
+    // ── FIM DA CONFIGURAÇÃO ────────────────────────────────────────────────
+
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const storage = getStorage(app);
-
-    window.__firebase = { auth, db, storage, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp, ref, uploadString, getDownloadURL };
+    window.__firebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp };
 
     window.dispatchEvent(new Event('firebase-ready'));
   </script>
@@ -66,7 +68,9 @@
     <div class="auth-orb orb1"></div>
     <div class="auth-orb orb2"></div>
   </div>
-  <div class="auth-container">
+
+  <!-- ── ETAPA 1: Login (email + senha) ── -->
+  <div class="auth-container" id="auth-step-login">
     <div class="auth-logo">
       <svg width="48" height="48" viewBox="0 0 64 64" fill="none">
         <rect width="64" height="64" rx="18" fill="#1A6BF0"/>
@@ -76,15 +80,7 @@
       <h1>PaceRun</h1>
       <p>Seu companheiro de corrida</p>
     </div>
-
-    <!-- Tab selector -->
-    <div class="auth-tabs">
-      <button class="auth-tab active" data-tab="login">Entrar</button>
-      <button class="auth-tab" data-tab="register">Cadastrar</button>
-    </div>
-
-    <!-- Login -->
-    <div id="tab-login" class="auth-form">
+    <div class="auth-form">
       <div class="form-group">
         <label>E-mail</label>
         <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email" />
@@ -97,28 +93,59 @@
       <button class="btn-ghost" id="btn-forgot">Esqueci minha senha</button>
       <div id="login-error" class="form-error hidden"></div>
     </div>
+    <div class="auth-divider"><span>Novo por aqui?</span></div>
+    <button class="btn-outline-blue" id="btn-go-register">Criar uma conta gratuita</button>
+  </div>
 
-    <!-- Register -->
-    <div id="tab-register" class="auth-form hidden">
+  <!-- ── ETAPA 2: Cadastro — só e-mail ── -->
+  <div class="auth-container hidden" id="auth-step-email">
+    <button class="auth-back-btn" id="btn-back-to-login">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Voltar
+    </button>
+    <div class="auth-logo">
+      <div class="auth-step-icon">📧</div>
+      <h1>Criar conta</h1>
+      <p>Informe seu e-mail para começar</p>
+    </div>
+    <div class="auth-form">
       <div class="form-group">
-        <label>Nome completo</label>
-        <input type="text" id="reg-name" placeholder="Seu nome" autocomplete="name" />
-      </div>
-      <div class="form-group">
-        <label>E-mail</label>
+        <label>Seu e-mail</label>
         <input type="email" id="reg-email" placeholder="seu@email.com" autocomplete="email" />
       </div>
-      <div class="form-group">
-        <label>Senha</label>
-        <input type="password" id="reg-password" placeholder="mínimo 6 caracteres" autocomplete="new-password" />
-      </div>
-      <button class="btn-primary" id="btn-register">Criar conta</button>
+      <button class="btn-primary" id="btn-send-link">Enviar link de acesso</button>
       <div id="reg-error" class="form-error hidden"></div>
       <div id="reg-success" class="form-success hidden">
-        ✓ Conta criada! Verifique seu e-mail para ativar o acesso.
+        ✉️ Link enviado! Verifique sua caixa de entrada e clique no link para continuar o cadastro.
       </div>
     </div>
   </div>
+
+  <!-- ── ETAPA 3: Completa cadastro (nome + senha) — acessada via link do e-mail ── -->
+  <div class="auth-container hidden" id="auth-step-complete">
+    <div class="auth-logo">
+      <div class="auth-step-icon">🏃</div>
+      <h1>Quase lá!</h1>
+      <p>Complete seu perfil para começar</p>
+    </div>
+    <div class="auth-form">
+      <div class="form-group">
+        <label>Seu nome</label>
+        <input type="text" id="complete-name" placeholder="Como quer ser chamado?" autocomplete="name" />
+      </div>
+      <div class="form-group">
+        <label>Crie uma senha</label>
+        <input type="password" id="complete-password" placeholder="mínimo 6 caracteres" autocomplete="new-password" />
+      </div>
+      <div class="form-group">
+        <label>Confirmar senha</label>
+        <input type="password" id="complete-password2" placeholder="repita a senha" autocomplete="new-password" />
+      </div>
+      <button class="btn-primary" id="btn-complete-register">Criar minha conta</button>
+      <div id="complete-error" class="form-error hidden"></div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ APP -->

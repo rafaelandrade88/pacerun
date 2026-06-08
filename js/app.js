@@ -47,13 +47,37 @@ function init() {
 }
 
 // ── Auth State ────────────────────────────────────────────
+let _appSetupDone = false;
+
 async function handleAuthChange(user) {
   if (user) {
     State.user = user;
     await loadUserProfile(user.uid);
+
+    // Bloqueia acesso se o perfil não foi completado (cadastro via link pendente)
+    const profileComplete = State.userProfile?.name && State.userProfile.name.trim() !== '';
+    if (!profileComplete) {
+      // Usuário logado via email-link mas ainda não completou o perfil
+      document.getElementById('auth-screen').classList.remove('hidden');
+      document.getElementById('app').classList.add('hidden');
+      window._pendingUser = user;
+      window._pendingEmail = user.email;
+      showAuthStep('complete');
+      if (!_appSetupDone) { setupAuth(); }
+      return;
+    }
+
     showApp();
-    setupApp();
+    if (!_appSetupDone) {
+      _appSetupDone = true;
+      setupApp();
+    } else {
+      // Re-login: só atualiza o header
+      updateHeaderUI();
+      loadProfileData();
+    }
   } else {
+    _appSetupDone = false;
     showAuth();
     setupAuth();
   }
@@ -61,11 +85,17 @@ async function handleAuthChange(user) {
 
 async function loadUserProfile(uid) {
   const { db, doc, getDoc } = window.__firebase;
-  const snap = await getDoc(doc(db, 'users', uid));
-  if (snap.exists()) {
-    State.userProfile = snap.data();
-  } else {
-    State.userProfile = { name: State.user.displayName || 'Atleta', weight: 70, totalRuns: 0, totalDistance: 0 };
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (snap.exists()) {
+      State.userProfile = snap.data();
+    } else {
+      // Perfil ainda não criado (usuário no meio do fluxo de cadastro)
+      State.userProfile = { name: '', weight: 70, totalRuns: 0, totalDistance: 0, totalDuration: 0 };
+    }
+  } catch (e) {
+    console.error('loadUserProfile error:', e);
+    State.userProfile = { name: '', weight: 70, totalRuns: 0, totalDistance: 0, totalDuration: 0 };
   }
   updateHeaderUI();
 }
@@ -81,19 +111,16 @@ function showApp() {
   document.getElementById('app').classList.remove('hidden');
 }
 
-function setupAuth() {
-  // Tabs
-  document.querySelectorAll('.auth-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.auth-tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const tab = btn.dataset.tab;
-      document.getElementById('tab-login').classList.toggle('hidden', tab !== 'login');
-      document.getElementById('tab-register').classList.toggle('hidden', tab !== 'register');
-    });
+// ── Helpers de navegação entre etapas ────────────────────
+function showAuthStep(step) {
+  ['auth-step-login', 'auth-step-email', 'auth-step-complete'].forEach(id => {
+    document.getElementById(id)?.classList.add('hidden');
   });
+  document.getElementById('auth-step-' + step)?.classList.remove('hidden');
+}
 
-  // Login
+function setupAuth() {
+  // ── ETAPA 1: Login ────────────────────────────────────
   document.getElementById('btn-login').addEventListener('click', async () => {
     const { auth, signInWithEmailAndPassword } = window.__firebase;
     const email = document.getElementById('login-email').value.trim();
@@ -101,11 +128,10 @@ function setupAuth() {
     const errEl = document.getElementById('login-error');
     const btn = document.getElementById('btn-login');
 
-    if (!email || !password) { showError(errEl, 'Preencha todos os campos.'); return; }
+    if (!email || !password) { showError(errEl, 'Preencha e-mail e senha.'); return; }
 
     btn.textContent = 'Entrando...';
     btn.disabled = true;
-
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (e) {
@@ -116,61 +142,180 @@ function setupAuth() {
     }
   });
 
-  // Register
-  document.getElementById('btn-register').addEventListener('click', async () => {
-    const { auth, db, createUserWithEmailAndPassword, sendEmailVerification, updateProfile, doc, setDoc, serverTimestamp } = window.__firebase;
-    const name = document.getElementById('reg-name').value.trim();
+  // Navega para cadastro
+  document.getElementById('btn-go-register').addEventListener('click', () => {
+    showAuthStep('email');
+  });
+
+  // Volta para login
+  document.getElementById('btn-back-to-login').addEventListener('click', () => {
+    showAuthStep('login');
+  });
+
+  // Esqueci senha
+  document.getElementById('btn-forgot').addEventListener('click', async () => {
+    const { auth, sendPasswordResetEmail } = window.__firebase;
+    const email = document.getElementById('login-email').value.trim();
+    const errEl = document.getElementById('login-error');
+    if (!email) { showError(errEl, 'Digite seu e-mail acima primeiro.'); return; }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showToast('✉️ E-mail de recuperação enviado!');
+    } catch (e) {
+      showError(errEl, 'E-mail não encontrado.');
+    }
+  });
+
+  // ── ETAPA 2: Envia link de cadastro por e-mail ─────────
+  document.getElementById('btn-send-link').addEventListener('click', async () => {
+    const { auth, sendSignInLinkToEmail } = window.__firebase;
     const email = document.getElementById('reg-email').value.trim();
-    const password = document.getElementById('reg-password').value;
     const errEl = document.getElementById('reg-error');
     const succEl = document.getElementById('reg-success');
-    const btn = document.getElementById('btn-register');
+    const btn = document.getElementById('btn-send-link');
 
-    if (!name || !email || !password) { showError(errEl, 'Preencha todos os campos.'); return; }
-    if (password.length < 6) { showError(errEl, 'Senha deve ter pelo menos 6 caracteres.'); return; }
+    if (!email || !email.includes('@')) {
+      showError(errEl, 'Digite um e-mail válido.'); return;
+    }
 
-    btn.textContent = 'Criando conta...';
+    btn.textContent = 'Enviando...';
     btn.disabled = true;
 
+    // URL que o Firebase vai redirecionar após o clique no e-mail
+    // Deve ser a URL exata do seu app no GitHub Pages
+    const actionCodeSettings = {
+      url: 'https://rafaelandrade88.github.io/pacerun/',
+      handleCodeInApp: true,
+    };
+
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(cred.user, { displayName: name });
-      await sendEmailVerification(cred.user);
-
-      // Salva perfil no Firestore
-      await setDoc(doc(db, 'users', cred.user.uid), {
-        name,
-        email,
-        weight: 70,
-        photoURL: '',
-        totalRuns: 0,
-        totalDistance: 0,
-        totalDuration: 0,
-        createdAt: serverTimestamp(),
-      });
-
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+      // Salva o e-mail localmente para recuperar na etapa 3
+      window.localStorage.setItem('pacerun_email_for_link', email);
       errEl.classList.add('hidden');
       succEl.classList.remove('hidden');
+      btn.textContent = 'Link enviado ✓';
     } catch (e) {
-      showError(errEl, authErrorMsg(e.code));
-    } finally {
-      btn.textContent = 'Criar conta';
+      console.error(e);
+      showError(errEl, authErrorMsg(e.code) || 'Erro ao enviar e-mail. Tente novamente.');
+      btn.textContent = 'Enviar link de acesso';
       btn.disabled = false;
     }
   });
 
-  // Forgot password
-  document.getElementById('btn-forgot').addEventListener('click', async () => {
-    const { auth, sendPasswordResetEmail } = window.__firebase;
-    const email = document.getElementById('login-email').value.trim();
-    if (!email) { showToast('Digite seu e-mail primeiro.'); return; }
-    try {
-      await sendPasswordResetEmail(auth, email);
-      showToast('E-mail de recuperação enviado!');
-    } catch (e) {
-      showToast('E-mail não encontrado.');
+  // ── ETAPA 3: Completa cadastro (retorno do link) ───────
+  document.getElementById('btn-complete-register')?.addEventListener('click', completeRegistration);
+
+  // Verifica ao carregar se a URL tem um link de sign-in do Firebase
+  checkEmailLink();
+}
+
+// ── Verifica se a URL atual é um link de sign-in Firebase ──
+async function checkEmailLink() {
+  const { auth, isSignInWithEmailLink, signInWithEmailLink, db,
+          doc, setDoc, getDoc, updateProfile, serverTimestamp } = window.__firebase;
+
+  if (!isSignInWithEmailLink(auth, window.location.href)) return;
+
+  // É um link de cadastro — recupera o e-mail salvo
+  let email = window.localStorage.getItem('pacerun_email_for_link');
+  if (!email) {
+    // Se abriu em outro dispositivo, pede o e-mail
+    email = window.prompt('Por favor, confirme seu e-mail para concluir o cadastro:');
+    if (!email) return;
+  }
+
+  try {
+    // Faz o sign-in via link
+    const result = await signInWithEmailLink(auth, email, window.location.href);
+    window.localStorage.removeItem('pacerun_email_for_link');
+
+    // Limpa a URL para não reutilizar o link
+    window.history.replaceState(null, '', '/pacerun/');
+
+    // Verifica se o perfil já existe (re-abertura do link)
+    const snap = await getDoc(doc(db, 'users', result.user.uid));
+    if (snap.exists() && snap.data().name) {
+      // Já completou antes — só entra
+      return;
     }
-  });
+
+    // Primeiro acesso — mostra etapa 3
+    document.getElementById('auth-screen').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+    showAuthStep('complete');
+    // Armazena email temporariamente para etapa 3
+    window._pendingUser = result.user;
+    window._pendingEmail = email;
+
+  } catch (e) {
+    console.error('Email link error:', e);
+    showToast('Link inválido ou expirado. Solicite um novo.');
+    showAuthStep('login');
+  }
+}
+
+// ── Finaliza cadastro com nome + senha ──────────────────
+async function completeRegistration() {
+  const { auth, db, updateProfile, doc, setDoc, serverTimestamp,
+          EmailAuthProvider, linkWithCredential } = window.__firebase;
+
+  const name = document.getElementById('complete-name').value.trim();
+  const pass1 = document.getElementById('complete-password').value;
+  const pass2 = document.getElementById('complete-password2').value;
+  const errEl = document.getElementById('complete-error');
+  const btn = document.getElementById('btn-complete-register');
+
+  if (!name) { showError(errEl, 'Digite seu nome.'); return; }
+  if (pass1.length < 6) { showError(errEl, 'Senha deve ter pelo menos 6 caracteres.'); return; }
+  if (pass1 !== pass2) { showError(errEl, 'As senhas não coincidem.'); return; }
+
+  btn.textContent = 'Criando conta...';
+  btn.disabled = true;
+
+  try {
+    const user = window._pendingUser || auth.currentUser;
+    if (!user) throw new Error('Sessão perdida. Tente novamente.');
+
+    // Atualiza displayName
+    await updateProfile(user, { displayName: name });
+
+    // Vincula e-mail + senha ao usuário criado via link
+    const credential = EmailAuthProvider.credential(
+      window._pendingEmail || user.email,
+      pass1
+    );
+    try {
+      await linkWithCredential(user, credential);
+    } catch (linkErr) {
+      // Se já tem senha vinculada (provider-already-linked), ignora
+      if (linkErr.code !== 'auth/provider-already-linked') throw linkErr;
+    }
+
+    // Cria perfil no Firestore
+    await setDoc(doc(db, 'users', user.uid), {
+      name,
+      email: window._pendingEmail || user.email,
+      weight: 70,
+      photoURL: '',
+      totalRuns: 0,
+      totalDistance: 0,
+      totalDuration: 0,
+      createdAt: serverTimestamp(),
+    });
+
+    window._pendingUser = null;
+    window._pendingEmail = null;
+
+    showToast('🎉 Bem-vindo ao PaceRun, ' + name.split(' ')[0] + '!');
+    // onAuthStateChanged vai detectar e abrir o app automaticamente
+
+  } catch (e) {
+    console.error(e);
+    showError(errEl, e.message || 'Erro ao criar conta. Tente novamente.');
+    btn.textContent = 'Criar minha conta';
+    btn.disabled = false;
+  }
 }
 
 function authErrorMsg(code) {
@@ -219,23 +364,43 @@ function getAvatarUrl(name) {
 // ── Navigation ────────────────────────────────────────────
 function setupNav() {
   document.querySelectorAll('.nav-item').forEach(btn => {
-    btn.addEventListener('click', () => navigateTo(btn.dataset.page));
+    btn.addEventListener('click', () => {
+      const page = btn.dataset.page;
+      if (page) navigateTo(page);
+    });
   });
-  document.getElementById('header-avatar').addEventListener('click', () => navigateTo('profile'));
+  document.getElementById('header-avatar')?.addEventListener('click', () => navigateTo('profile'));
 }
 
 function navigateTo(page) {
   State.currentPage = page;
 
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById('page-' + page)?.classList.add('active');
+  // Esconde todas as páginas
+  document.querySelectorAll('.page').forEach(p => {
+    p.classList.remove('active');
+    p.style.display = 'none';
+  });
 
+  // Mostra a página alvo
+  const target = document.getElementById('page-' + page);
+  if (target) {
+    target.classList.add('active');
+    target.style.display = 'block';
+  }
+
+  // Atualiza nav ativa
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
 
+  // Rola para o topo
+  document.getElementById('app-main')?.scrollTo(0, 0);
+
+  // Carrega dados da página
   if (page === 'progress') loadProgress();
   if (page === 'ranking') loadRanking(document.querySelector('.ranking-tab.active')?.dataset.rank || 'distance');
   if (page === 'community') loadCommunity();
+  if (page === 'feed') refreshFeedIfNeeded();
+  if (page === 'profile') loadProfileData();
 }
 
 // ════════════════════════════════════════════════════════
@@ -512,9 +677,10 @@ function initMap() {
 
 // ── Activity Save ──────────────────────────────────────────
 async function saveActivity() {
-  if (!State.currentActivity || !State.user) return;
+  if (!State.currentActivity) { showToast('Nenhuma atividade para salvar.'); return; }
+  if (!State.user) { showToast('Você precisa estar logado.'); return; }
 
-  const { db, collection, addDoc, doc, updateDoc, serverTimestamp, getDoc } = window.__firebase;
+  const { db, collection, addDoc, doc, updateDoc, getDoc, serverTimestamp } = window.__firebase;
   const btn = document.getElementById('btn-save-activity');
   btn.textContent = 'Salvando...';
   btn.disabled = true;
@@ -522,43 +688,70 @@ async function saveActivity() {
   try {
     const act = State.currentActivity;
 
-    // Salva atividade
-    await addDoc(collection(db, 'activities'), {
+    // Upload de foto se houver (Cloudinary)
+    let photoURL = '';
+    if (act.photo && act.photo.startsWith('data:')) {
+      const uploaded = await uploadActivityPhoto(act.photo, `act_${Date.now()}`);
+      photoURL = uploaded || '';
+    }
+
+    // Dados da atividade
+    const activityData = {
       userId: State.user.uid,
       userName: State.userProfile?.name || State.user.displayName || 'Atleta',
       userPhotoURL: State.userProfile?.photoURL || '',
-      type: act.type,
-      distance: parseFloat(act.distance.toFixed(3)),
-      duration: Math.round(act.duration),
-      avgSpeed: parseFloat(act.avgSpeed.toFixed(2)),
-      maxSpeed: parseFloat(act.maxSpeed.toFixed(2)),
-      pace: act.pace,
-      calories: Math.round(act.calories),
-      photoURL: act.photo || '',
+      type: act.type || 'running',
+      distance: parseFloat((act.distance || 0).toFixed(3)),
+      duration: Math.round(act.duration || 0),
+      avgSpeed: parseFloat((act.avgSpeed || 0).toFixed(2)),
+      maxSpeed: parseFloat((act.maxSpeed || 0).toFixed(2)),
+      pace: act.pace || '--:--',
+      calories: Math.round(act.calories || 0),
+      photoURL,
       timestamp: serverTimestamp(),
       date: new Date().toISOString(),
-    });
+    };
 
-    // Atualiza totais do usuário
-    const userRef = doc(db, 'users', State.user.uid);
-    const userSnap = await getDoc(userRef);
-    const userData = userSnap.data() || {};
-    await updateDoc(userRef, {
-      totalRuns: (userData.totalRuns || 0) + 1,
-      totalDistance: parseFloat(((userData.totalDistance || 0) + act.distance).toFixed(3)),
-      totalDuration: (userData.totalDuration || 0) + Math.round(act.duration),
-    });
+    // Salva a atividade
+    await addDoc(collection(db, 'activities'), activityData);
 
-    State.userProfile = { ...State.userProfile, totalRuns: (State.userProfile?.totalRuns || 0) + 1 };
+    // Atualiza totais do usuário com transaction segura
+    try {
+      const userRef = doc(db, 'users', State.user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const d = userSnap.data();
+        await updateDoc(userRef, {
+          totalRuns: (d.totalRuns || 0) + 1,
+          totalDistance: parseFloat(((d.totalDistance || 0) + activityData.distance).toFixed(3)),
+          totalDuration: (d.totalDuration || 0) + activityData.duration,
+        });
+        State.userProfile = {
+          ...State.userProfile,
+          totalRuns: (d.totalRuns || 0) + 1,
+          totalDistance: parseFloat(((d.totalDistance || 0) + activityData.distance).toFixed(3)),
+          totalDuration: (d.totalDuration || 0) + activityData.duration,
+        };
+      }
+    } catch (profileErr) {
+      // Não impede o salvamento da atividade se atualizar totais falhar
+      console.warn('Erro ao atualizar totais do usuário:', profileErr);
+    }
 
     showToast('Atividade salva com sucesso! 🎉');
     document.getElementById('modal-summary').classList.add('hidden');
     resetActivity();
-
     if (State.currentPage === 'progress') loadProgress();
+
   } catch (e) {
-    console.error(e);
-    showToast('Erro ao salvar. Verifique sua conexão.');
+    console.error('saveActivity error:', e);
+    // Mostra o erro real para facilitar diagnóstico
+    const msg = e.code === 'permission-denied'
+      ? 'Permissão negada. Verifique as regras do Firestore.'
+      : e.code === 'unavailable'
+      ? 'Sem conexão. Tente novamente.'
+      : `Erro: ${e.message || e.code || 'desconhecido'}`;
+    showToast(msg, 5000);
   } finally {
     btn.textContent = 'Salvar atividade';
     btn.disabled = false;
@@ -637,6 +830,12 @@ function resetActivity() {
 // ════════════════════════════════════════════════════════
 // FEED — IA powered via Anthropic API
 // ════════════════════════════════════════════════════════
+let _feedLoaded = false;
+
+function refreshFeedIfNeeded() {
+  if (!_feedLoaded) loadFeed();
+}
+
 async function loadFeed() {
   const loadingEl = document.getElementById('feed-loading');
   const contentEl = document.getElementById('feed-content');
@@ -708,6 +907,7 @@ Os títulos devem ser específicos e úteis para corredores.`
 
   loadingEl.classList.add('hidden');
   contentEl.classList.remove('hidden');
+  _feedLoaded = true;
 }
 
 function renderFeed(articles) {
@@ -987,23 +1187,77 @@ function setupProfilePage() {
 }
 
 async function uploadAvatar(dataURL) {
-  const { storage, db, ref, uploadString, getDownloadURL, doc, updateDoc } = window.__firebase;
+  // ── Cloudinary — upload direto do browser, plano gratuito ──
+  // Configure em: https://cloudinary.com → Settings → Upload → Upload presets
+  // Crie um preset com "Signing Mode: Unsigned" e cole o nome abaixo
+  const CLOUD_NAME  = 'SEU_CLOUD_NAME';   // Ex: 'dxyz1234'
+  const UPLOAD_PRESET = 'SEU_PRESET';     // Ex: 'pacerun_unsigned'
+
+  if (CLOUD_NAME === 'SEU_CLOUD_NAME') {
+    showToast('⚠️ Configure o Cloudinary no app.js para habilitar fotos.');
+    return;
+  }
+
+  const { db, doc, updateDoc } = window.__firebase;
 
   try {
     showToast('Enviando foto...');
-    const storageRef = ref(storage, `avatars/${State.user.uid}`);
-    await uploadString(storageRef, dataURL, 'data_url');
-    const url = await getDownloadURL(storageRef);
 
+    // Converte dataURL → Blob → FormData (Cloudinary aceita ambos)
+    const formData = new FormData();
+    formData.append('file', dataURL);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append('public_id', `pacerun/avatars/${State.user.uid}`);
+    formData.append('overwrite', 'true');
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) throw new Error(`Cloudinary error: ${res.status}`);
+
+    const data = await res.json();
+    const url = data.secure_url;
+
+    // Salva URL no Firestore
     await updateDoc(doc(db, 'users', State.user.uid), { photoURL: url });
     State.userProfile.photoURL = url;
 
     document.getElementById('profile-avatar').src = url;
     document.getElementById('header-avatar').src = url;
-    showToast('Foto atualizada!');
+    showToast('Foto de perfil atualizada! ✅');
   } catch (e) {
-    console.error(e);
-    showToast('Erro ao enviar foto. Verifique as regras do Storage.');
+    console.error('Upload avatar error:', e);
+    showToast('Erro ao enviar foto. Verifique o Cloudinary.');
+  }
+}
+
+// ── Upload de foto de atividade (Cloudinary) ──────────────
+async function uploadActivityPhoto(dataURL, activityId) {
+  const CLOUD_NAME    = 'SEU_CLOUD_NAME';
+  const UPLOAD_PRESET = 'SEU_PRESET';
+
+  if (CLOUD_NAME === 'SEU_CLOUD_NAME') return null;
+
+  try {
+    const formData = new FormData();
+    formData.append('file', dataURL);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append('public_id', `pacerun/activities/${State.user.uid}/${activityId}`);
+    formData.append('overwrite', 'true');
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.secure_url;
+  } catch (e) {
+    console.error('Upload activity photo error:', e);
+    return null;
   }
 }
 
