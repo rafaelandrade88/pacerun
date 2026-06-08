@@ -104,6 +104,14 @@ async function loadUserProfile(uid) {
 function showAuth() {
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
+  showAuthStep('login');
+  // Limpa campos para evitar autocomplete do Safari preencher automaticamente
+  setTimeout(() => {
+    const pwd = document.getElementById('login-password');
+    if (pwd) pwd.value = '';
+    const email = document.getElementById('login-email');
+    if (email) email.value = '';
+  }, 100);
 }
 
 function showApp() {
