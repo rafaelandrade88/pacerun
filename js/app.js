@@ -396,12 +396,13 @@ function setupApp() {
   setupProfilePage();
   setupNotifications();
   setupRaces();
+  // Expõe RACES_DATABASE globalmente para a comunidade usar
+  window.RACES_DATABASE = RACES_DATABASE;
   navigateTo('activity');
   loadFeed();
   loadRanking('distance');
   loadProfileData();
   setTimeout(checkCommunityNotifications, 3000);
-  // Verifica se havia corrida em andamento quando o app foi fechado
   setTimeout(checkInterruptedActivity, 1500);
 }
 
@@ -514,7 +515,6 @@ function setupActivityPage() {
 
   document.getElementById('btn-save-activity').addEventListener('click', saveActivity);
   document.getElementById('btn-discard-activity').addEventListener('click', () => {
-    localStorage.removeItem('pacerun_active_run');
     document.getElementById('modal-summary').classList.add('hidden');
     resetActivity();
   });
@@ -547,7 +547,6 @@ function startActivity() {
   State.activity.positions = [];
   State.activity.distance = 0;
   State.activity.speeds = [];
-  State.activity.recentSpeeds = []; // janela deslizante para pace suavizado
   State.activity.maxSpeed = 0;
   State.activity.photo = null;
 
@@ -563,11 +562,8 @@ function startActivity() {
   document.getElementById('map-idle').classList.add('hidden');
   document.querySelector('.gps-dot').classList.add('active');
 
-  // Timer — salva estado no localStorage a cada segundo (Bug 1 fix)
-  State.activity.intervalId = setInterval(() => {
-    updateActivityUI();
-    persistActivityState();
-  }, 1000);
+  // Timer
+  State.activity.intervalId = setInterval(updateActivityUI, 1000);
 
   // GPS Watch
   State.activity.watchId = navigator.geolocation.watchPosition(
@@ -575,110 +571,6 @@ function startActivity() {
     err => console.warn('GPS error:', err),
     { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
   );
-}
-
-// ── Persiste estado no localStorage para sobreviver fechamento do app ──
-function persistActivityState() {
-  if (!State.activity.running) return;
-  try {
-    localStorage.setItem('pacerun_active_run', JSON.stringify({
-      running: true,
-      startTime: State.activity.startTime,
-      pausedTime: State.activity.pausedTime,
-      distance: State.activity.distance,
-      speeds: State.activity.speeds.slice(-20), // últimas 20 leituras
-      maxSpeed: State.activity.maxSpeed,
-      type: State.activity.type,
-      positions: State.activity.positions.slice(-100), // últimas 100 posições
-      savedAt: Date.now(),
-    }));
-  } catch (e) { /* localStorage cheio, ignora */ }
-}
-
-// ── Verifica ao iniciar o app se havia corrida em andamento ──
-function checkInterruptedActivity() {
-  try {
-    const raw = localStorage.getItem('pacerun_active_run');
-    if (!raw) return;
-    const saved = JSON.parse(raw);
-
-    // Considera corrida válida se foi salva há menos de 2 horas
-    const age = Date.now() - (saved.savedAt || 0);
-    if (!saved.running || age > 2 * 3600 * 1000) {
-      localStorage.removeItem('pacerun_active_run');
-      return;
-    }
-
-    // Mostra opção de retomar ou descartar
-    showInterruptedActivityModal(saved);
-  } catch (e) {
-    localStorage.removeItem('pacerun_active_run');
-  }
-}
-
-function showInterruptedActivityModal(saved) {
-  const dist = (saved.distance || 0).toFixed(2);
-  const elapsed = Math.round((Date.now() - saved.startTime - saved.pausedTime) / 1000);
-  const dur = formatDuration(elapsed);
-
-  // Cria modal dinâmico
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.id = 'modal-interrupted';
-  modal.innerHTML = `
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div style="text-align:center;margin-bottom:20px">
-        <div style="font-size:48px;margin-bottom:8px">⚠️</div>
-        <h2 style="font-family:var(--font-display);font-size:22px;font-weight:800">Corrida interrompida</h2>
-        <p style="color:var(--text-secondary);margin-top:8px;font-size:14px">
-          O app foi fechado durante uma atividade.<br>
-          <strong style="color:var(--white)">${dist} km · ${dur}</strong> registrados.
-        </p>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <button class="btn-primary" id="btn-recover-run">Salvar atividade registrada</button>
-        <button class="btn-ghost btn-danger" id="btn-discard-interrupted">Descartar</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-
-  document.getElementById('btn-recover-run').addEventListener('click', () => {
-    // Reconstrói currentActivity a partir do estado salvo
-    const duration = Math.round((saved.savedAt - saved.startTime - saved.pausedTime) / 1000);
-    const avgSpeed = saved.distance > 0 && duration > 0 ? saved.distance / (duration / 3600) : 0;
-    const pace = avgSpeed > 0 ? 60 / avgSpeed : 0;
-    const paceMin = Math.floor(pace);
-    const paceSec = Math.round((pace - paceMin) * 60);
-
-    State.currentActivity = {
-      type: saved.type || 'running',
-      distance: saved.distance || 0,
-      duration,
-      avgSpeed,
-      maxSpeed: saved.maxSpeed || 0,
-      pace: avgSpeed > 0 ? `${paceMin}:${String(paceSec).padStart(2, '0')}` : '--:--',
-      calories: calcCaloriesStatic(saved.distance || 0, duration, State.userProfile?.weight || 70),
-      photo: null,
-      positions: saved.positions || [],
-      timestamp: saved.startTime,
-    };
-
-    localStorage.removeItem('pacerun_active_run');
-    modal.remove();
-    showSummaryModal(State.currentActivity);
-  });
-
-  document.getElementById('btn-discard-interrupted').addEventListener('click', () => {
-    localStorage.removeItem('pacerun_active_run');
-    modal.remove();
-  });
-}
-
-// Versão estática do calcCalories (sem depender de State.activity.type)
-function calcCaloriesStatic(distKm, durationSec, weight, type = 'running') {
-  const MET = type === 'running' ? 8.5 : 3.5;
-  return MET * weight * (durationSec / 3600);
 }
 
 function pauseActivity() {
@@ -706,13 +598,11 @@ function resumeActivity() {
 function handleStop() {
   if (!State.activity.running) return;
 
+  // Para tudo
   clearInterval(State.activity.intervalId);
   navigator.geolocation.clearWatch(State.activity.watchId);
   State.activity.running = false;
   State.activity.paused = false;
-
-  // Para de persistir — corrida foi encerrada pelo usuário
-  localStorage.removeItem('pacerun_active_run');
 
   // Reseta botões
   document.getElementById('icon-start').classList.remove('hidden');
@@ -743,6 +633,7 @@ function handleStop() {
     weight,
     photo: State.activity.photo,
     positions: State.activity.positions,
+    kmSplits: State.activity.kmSplits || [],
     timestamp: Date.now(),
   };
 
@@ -757,53 +648,42 @@ function onPositionUpdate(pos) {
     const last = positions[positions.length - 1];
     const d = haversine(last.lat, last.lng, latitude, longitude);
     if (d > 0.005 && accuracy < 50) {
+      const prevDist = State.activity.distance;
       State.activity.distance += d;
+
+      // ── Rastreamento de pace por km ──────────────────────
+      if (!State.activity.kmSplits) State.activity.kmSplits = [];
+      const prevKm = Math.floor(prevDist);
+      const currKm = Math.floor(State.activity.distance);
+      if (currKm > prevKm && currKm > 0) {
+        // Cruzou a marca de 1km — registra o pace deste km
+        const elapsed = computeElapsed();
+        const kmTime = elapsed - (State.activity.kmSplits.reduce((s, k) => s + k.secs, 0));
+        const pace = kmTime / 60; // min/km
+        const paceMin = Math.floor(pace);
+        const paceSec = Math.round((pace - paceMin) * 60);
+        State.activity.kmSplits.push({
+          km: currKm,
+          secs: kmTime,
+          pace: `${paceMin}:${String(paceSec).padStart(2, '0')}`,
+        });
+      }
+
       if (State.polyline) {
         State.polyline.addLatLng([latitude, longitude]);
       }
     }
   }
 
-  positions.push({ lat: latitude, lng: longitude, ts: Date.now() });
+  positions.push({ lat: latitude, lng: longitude });
 
-  // ── Velocidade instantânea suavizada (Bug 2 fix) ──────────
-  // Prioriza speed do GPS quando disponível e plausível
-  let currentSpeed = 0;
-  if (speed != null && speed >= 0) {
-    currentSpeed = speed * 3.6; // m/s → km/h
-  } else if (positions.length >= 2) {
-    // Calcula a partir das últimas 2 posições
-    const prev = positions[positions.length - 2];
-    const curr = positions[positions.length - 1];
-    const timeDiff = (curr.ts - prev.ts) / 1000; // segundos
-    const distKm = haversine(prev.lat, prev.lng, curr.lat, curr.lng);
-    if (timeDiff > 0 && distKm > 0) {
-      currentSpeed = (distKm / timeDiff) * 3600; // km/h
-    }
-  }
-
-  // Limita velocidade máxima plausível (100 km/h = sprint impossível)
-  currentSpeed = Math.min(currentSpeed, 35);
-
-  // Janela deslizante de 5 leituras para suavizar velocidade instantânea
-  if (!State.activity.recentSpeeds) State.activity.recentSpeeds = [];
-  if (currentSpeed > 0) {
-    State.activity.recentSpeeds.push(currentSpeed);
-    if (State.activity.recentSpeeds.length > 5) State.activity.recentSpeeds.shift();
-  }
-
-  // Velocidade suavizada = média da janela
-  const smoothSpeed = State.activity.recentSpeeds.length > 0
-    ? State.activity.recentSpeeds.reduce((a, b) => a + b, 0) / State.activity.recentSpeeds.length
-    : 0;
-
+  const currentSpeed = speed != null ? speed * 3.6 : 0;
   if (currentSpeed > 0) State.activity.speeds.push(currentSpeed);
   if (currentSpeed > State.activity.maxSpeed) State.activity.maxSpeed = currentSpeed;
 
-  document.getElementById('act-speed').textContent = smoothSpeed.toFixed(1);
+  document.getElementById('act-speed').textContent = currentSpeed.toFixed(1);
   document.getElementById('act-max-speed').textContent = State.activity.maxSpeed.toFixed(1);
 
-  // Move mapa
   if (State.map) {
     State.map.setView([latitude, longitude], 17);
     if (State.userMarker) {
@@ -820,34 +700,21 @@ function onPositionUpdate(pos) {
 function updateActivityUI() {
   const elapsed = computeElapsed();
   const dist = State.activity.distance;
-
-  // ── Pace suavizado (Bug 2 fix) ──────────────────────────
-  // Só calcula pace com distância mínima de 0.05 km para evitar valores absurdos
-  const MIN_DIST_FOR_PACE = 0.05;
-  let paceStr = '--:--';
-  let avgSpeed = 0;
-
-  if (dist >= MIN_DIST_FOR_PACE && elapsed > 10) {
-    avgSpeed = dist / (elapsed / 3600);
-    const pace = 60 / avgSpeed; // min/km
-    // Limita pace a valores humanamente plausíveis (1:00 a 30:00 min/km)
-    if (pace >= 1 && pace <= 30) {
-      const paceMin = Math.floor(pace);
-      const paceSec = Math.round((pace - paceMin) * 60);
-      paceStr = `${paceMin}:${String(paceSec).padStart(2, '0')}`;
-    }
-  }
+  const avgSpeed = dist > 0 ? dist / (elapsed / 3600) : 0;
+  const pace = avgSpeed > 0 ? 60 / avgSpeed : 0;
+  const paceMin = Math.floor(pace);
+  const paceSec = Math.round((pace - paceMin) * 60);
 
   document.getElementById('act-distance').textContent = dist.toFixed(2);
   document.getElementById('act-duration').textContent = formatDuration(elapsed);
-  document.getElementById('act-pace').textContent = paceStr;
+  document.getElementById('act-pace').textContent = avgSpeed > 0
+    ? `${paceMin}:${String(paceSec).padStart(2, '0')}`
+    : '--:--';
   document.getElementById('act-calories').textContent = Math.round(calcCalories(dist, elapsed));
 
-  // Velocidade média histórica
+  // Velocidade média
   const speeds = State.activity.speeds;
-  const avgSpd = speeds.length > 0
-    ? speeds.reduce((a, b) => a + b, 0) / speeds.length
-    : 0;
+  const avgSpd = speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
   document.getElementById('act-avg-speed').textContent = avgSpd.toFixed(1);
 }
 
@@ -917,6 +784,7 @@ async function saveActivity() {
       pace: act.pace || '--:--',
       calories: Math.round(act.calories || 0),
       photoURL,
+      kmSplits: act.kmSplits || [],
       timestamp: serverTimestamp(),
       date: new Date().toISOString(),
     };
@@ -948,7 +816,6 @@ async function saveActivity() {
     }
 
     showToast('Atividade salva com sucesso! 🎉');
-    localStorage.removeItem('pacerun_active_run'); // limpa estado persistido
     document.getElementById('modal-summary').classList.add('hidden');
     resetActivity();
 
@@ -976,7 +843,27 @@ async function saveActivity() {
 
 function showSummaryModal(act) {
   const container = document.getElementById('summary-stats');
-  const paceFormatted = act.pace;
+
+  // Splits por km
+  const splitsHtml = act.kmSplits && act.kmSplits.length > 0
+    ? `<div class="km-splits-section">
+        <h4 class="km-splits-title">⚡ Pace por km</h4>
+        <div class="km-splits-list">
+          ${act.kmSplits.map(s => {
+      // Classifica o pace: verde=rápido, amarelo=médio, vermelho=lento
+      const secs = s.secs;
+      const color = secs < 360 ? 'var(--green-neon)' : secs < 480 ? 'var(--amber)' : 'var(--blue-300)';
+      return `<div class="km-split-item">
+              <span class="km-split-label">KM ${s.km}</span>
+              <div class="km-split-bar-wrap">
+                <div class="km-split-bar" style="width:${Math.min(100, (480 / Math.max(secs, 1)) * 100)}%;background:${color}"></div>
+              </div>
+              <span class="km-split-pace" style="color:${color}">${s.pace}</span>
+            </div>`;
+    }).join('')}
+        </div>
+       </div>`
+    : '';
 
   container.innerHTML = `
     <div class="summary-stat highlight">
@@ -988,8 +875,8 @@ function showSummaryModal(act) {
       <div class="l">duração</div>
     </div>
     <div class="summary-stat">
-      <div class="v">${paceFormatted}</div>
-      <div class="l">ritmo /km</div>
+      <div class="v">${act.pace}</div>
+      <div class="l">ritmo médio</div>
     </div>
     <div class="summary-stat">
       <div class="v">${Math.round(act.calories)}</div>
@@ -1003,15 +890,14 @@ function showSummaryModal(act) {
       <div class="v">${act.maxSpeed.toFixed(1)}</div>
       <div class="l">km/h máx</div>
     </div>
+    ${splitsHtml}
   `;
 
-  // Reset photo preview
   document.getElementById('summary-photo-preview').classList.add('hidden');
   if (act.photo) {
     document.getElementById('summary-photo-preview').src = act.photo;
     document.getElementById('summary-photo-preview').classList.remove('hidden');
   }
-
   document.getElementById('modal-summary').classList.remove('hidden');
 }
 
@@ -1227,85 +1113,224 @@ window.toggleFeedCard = function (i) {
 // ════════════════════════════════════════════════════════
 // COMMUNITY
 // ════════════════════════════════════════════════════════
-async function loadCommunity(searchTerm = '') {
+// ════════════════════════════════════════════════════════
+// COMUNIDADE — 4 sub-abas
+// ════════════════════════════════════════════════════════
+
+function setupCommunityTabs() {
+  document.querySelectorAll('.comm-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.comm-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const section = tab.dataset.comm;
+      document.querySelectorAll('.comm-section').forEach(s => s.classList.add('hidden'));
+      document.getElementById('comm-' + section)?.classList.remove('hidden');
+      if (section === 'runners') loadCommunityRunners();
+      if (section === 'challenges') loadChallenges();
+      if (section === 'events') loadCommunityEvents();
+      if (section === 'leaderboard') loadLeaderboard();
+    });
+  });
+}
+
+async function loadCommunity() {
+  setupCommunityTabs();
+  loadCommunityRunners();
+}
+
+async function loadCommunityRunners(searchTerm = '') {
   const { db, collection, getDocs, query, orderBy, limit, where } = window.__firebase;
-  const listEl = document.getElementById('community-list');
+  const listEl = document.getElementById('comm-runners-list');
+  if (!listEl) return;
   listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Carregando...</p>';
 
   try {
-    // Busca todos os usuários EXCETO o atual
     const q = query(collection(db, 'users'), orderBy('totalDistance', 'desc'), limit(30));
     const snap = await getDocs(q);
     let users = [];
-    snap.forEach(d => {
-      // Exclui o próprio usuário
-      if (d.id !== State.user?.uid) users.push({ id: d.id, ...d.data() });
-    });
+    snap.forEach(d => { if (d.id !== State.user?.uid) users.push({ id: d.id, ...d.data() }); });
 
-    if (searchTerm) {
-      users = users.filter(u => u.name?.toLowerCase().includes(searchTerm.toLowerCase()));
-    }
+    if (searchTerm) users = users.filter(u => u.name?.toLowerCase().includes(searchTerm.toLowerCase()));
 
     if (users.length === 0) {
-      listEl.innerHTML = `
-        <div style="padding:40px 20px;text-align:center;color:var(--text-muted)">
-          <div style="font-size:40px;margin-bottom:12px">👥</div>
-          <p>${searchTerm ? 'Nenhum usuário encontrado.' : 'Ainda não há outros usuários. Convide amigos!'}</p>
-        </div>`;
+      listEl.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--text-muted)"><div style="font-size:40px;margin-bottom:12px">👥</div><p>Convide amigos para o PaceRun!</p></div>`;
       return;
     }
 
-    // Busca última atividade de cada usuário (em paralelo, limitado)
-    const activityPromises = users.slice(0, 20).map(async u => {
+    const actPromises = users.slice(0, 20).map(async u => {
       try {
-        const aq = query(
-          collection(db, 'activities'),
-          where('userId', '==', u.id),
-          orderBy('timestamp', 'desc'),
-          limit(1)
-        );
+        const aq = query(collection(db, 'activities'), where('userId', '==', u.id), orderBy('timestamp', 'desc'), limit(1));
         const aSnap = await getDocs(aq);
-        if (!aSnap.empty) {
-          u.lastActivity = aSnap.docs[0].data();
-        }
-      } catch (e) { /* índice pode não existir ainda, ignora */ }
+        if (!aSnap.empty) u.lastActivity = aSnap.docs[0].data();
+      } catch { }
       return u;
     });
-
-    await Promise.all(activityPromises);
+    await Promise.all(actPromises);
 
     listEl.innerHTML = users.map(u => {
       const dist = (u.totalDistance || 0).toFixed(1);
-      const runs = u.totalRuns || 0;
       const last = u.lastActivity;
-      const lastText = last
-        ? `Última: ${last.type === 'running' ? '🏃' : '🚶'} ${last.distance?.toFixed(2)} km · ${formatDateShort(last.date)}`
-        : 'Ainda sem atividades';
-
-      return `
-        <div class="user-card">
-          <img class="user-avatar" src="${u.photoURL || getAvatarUrl(u.name || 'U')}"
-               alt="${u.name}" onerror="this.src='${getAvatarUrl(u.name || 'U')}'" />
-          <div class="user-info">
-            <div class="user-name">${u.name || 'Atleta'}</div>
-            <div class="user-stats">${dist} km total · ${runs} atividade${runs !== 1 ? 's' : ''}</div>
-            <div class="community-activity-badge">${lastText}</div>
-          </div>
-          <div style="color:var(--blue-300);font-family:var(--font-display);font-size:18px;font-weight:800;text-align:right;flex-shrink:0">
-            ${dist}<br><span style="font-size:11px;color:var(--text-muted);font-family:var(--font-body);font-weight:400">km</span>
-          </div>
-        </div>`;
+      const lastText = last ? `${last.type === 'running' ? '🏃' : '🚶'} ${last.distance?.toFixed(2)} km · ${formatDateShort(last.date)}` : 'Sem atividades';
+      return `<div class="user-card">
+        <img class="user-avatar" src="${u.photoURL || getAvatarUrl(u.name || 'U')}" alt="${u.name}" onerror="this.src='${getAvatarUrl(u.name || 'U')}'" />
+        <div class="user-info">
+          <div class="user-name">${u.name || 'Atleta'}</div>
+          <div class="user-stats">${dist} km · ${u.totalRuns || 0} atividades</div>
+          <div class="community-activity-badge">${lastText}</div>
+        </div>
+        <div style="color:var(--blue-300);font-family:var(--font-display);font-size:18px;font-weight:800;text-align:right;flex-shrink:0">${dist}<br><span style="font-size:11px;color:var(--text-muted);font-family:var(--font-body);font-weight:400">km</span></div>
+      </div>`;
     }).join('');
-
   } catch (e) {
-    console.error('loadCommunity error:', e);
-    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Erro ao carregar comunidade.</p>';
+    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Erro ao carregar.</p>';
   }
 }
 
 document.getElementById('community-search')?.addEventListener('input', e => {
-  loadCommunity(e.target.value);
+  loadCommunityRunners(e.target.value);
 });
+
+// ── DESAFIOS ──────────────────────────────────────────────
+const CHALLENGES = [
+  { id: 'c1', emoji: '🔥', title: 'Semana de Fogo', desc: 'Complete 3 corridas em 7 dias', target: 3, unit: 'corridas', type: 'weekly_runs', xp: 150 },
+  { id: 'c2', emoji: '🌅', title: 'Madrugador', desc: 'Corra antes das 7h por 5 dias', target: 5, unit: 'manhãs', type: 'early_runs', xp: 200 },
+  { id: 'c3', emoji: '🏅', title: 'Primeiro 5K', desc: 'Complete uma corrida de 5 km', target: 5, unit: 'km', type: 'single_run_dist', xp: 100 },
+  { id: 'c4', emoji: '💪', title: 'Consistência', desc: 'Corra por 4 semanas seguidas', target: 4, unit: 'semanas', type: 'streak_weeks', xp: 300 },
+  { id: 'c5', emoji: '⚡', title: 'Velocista', desc: 'Alcance pace abaixo de 5:30/km', target: 1, unit: 'vez', type: 'fast_pace', xp: 250 },
+  { id: 'c6', emoji: '🗺️', title: 'Explorador', desc: 'Acumule 20 km em uma semana', target: 20, unit: 'km', type: 'weekly_km', xp: 200 },
+  { id: 'c7', emoji: '🎯', title: 'Meio Maratona', desc: 'Corra 21 km acumulados', target: 21, unit: 'km', type: 'total_km', xp: 400 },
+  { id: 'c8', emoji: '👟', title: '100 km de Clube', desc: 'Acumule 100 km no total', target: 100, unit: 'km', type: 'total_km', xp: 1000 },
+];
+
+function loadChallenges() {
+  const listEl = document.getElementById('comm-challenges-list');
+  if (!listEl) return;
+
+  const totalDist = State.userProfile?.totalDistance || 0;
+  const totalRuns = State.userProfile?.totalRuns || 0;
+  const savedProgress = JSON.parse(localStorage.getItem('pacerun_challenges') || '{}');
+
+  listEl.innerHTML = CHALLENGES.map(c => {
+    let progress = 0;
+    if (c.type === 'total_km') progress = Math.min(totalDist, c.target);
+    if (c.type === 'weekly_runs') progress = Math.min(totalRuns % 3, c.target);
+    if (c.type === 'single_run_dist') progress = totalDist >= c.target ? c.target : Math.min(totalDist, c.target);
+    const pct = Math.min(100, Math.round((progress / c.target) * 100));
+    const done = pct >= 100;
+
+    return `<div class="challenge-card ${done ? 'done' : ''}">
+      <div class="challenge-top">
+        <div class="challenge-icon">${c.emoji}</div>
+        <div class="challenge-info">
+          <div class="challenge-title">${c.title} ${done ? '✅' : ''}</div>
+          <div class="challenge-desc">${c.desc}</div>
+        </div>
+        <div class="challenge-xp">+${c.xp} XP</div>
+      </div>
+      <div class="challenge-progress-wrap">
+        <div class="challenge-progress-bar" style="width:${pct}%"></div>
+      </div>
+      <div class="challenge-progress-text">${done ? 'Concluído!' : `${progress.toFixed(progress % 1 === 0 ? 0 : 1)} / ${c.target} ${c.unit}`}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── EVENTOS (Corridas reais de SP/Guarulhos) ──────────────
+function loadCommunityEvents() {
+  const listEl = document.getElementById('comm-events-list');
+  if (!listEl) return;
+
+  const allRaces = [
+    ...((window.RACES_DATABASE || {})['são paulo'] || []),
+    ...((window.RACES_DATABASE || {})['guarulhos'] || []),
+  ].filter(r => r.date && r.date.length >= 8).sort((a, b) => {
+    const [da, ma, ya] = a.date.split('/');
+    const [db2, mb, yb] = b.date.split('/');
+    return new Date(`${ya}-${ma}-${da}`) - new Date(`${yb}-${mb}-${db2}`);
+  });
+
+  if (allRaces.length === 0) {
+    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Nenhum evento cadastrado.</p>';
+    return;
+  }
+
+  listEl.innerHTML = allRaces.map(r => {
+    const distTags = (r.distances || []).map(d => `<span class="race-tag dist">${d}</span>`).join('');
+    return `<div class="race-card">
+      <div class="race-card-top">
+        <div class="race-date-badge"><div class="day">${r.day}</div><div class="month">${r.month}</div></div>
+        <div class="race-info">
+          <div class="race-name">${r.name}</div>
+          <div class="race-meta">${distTags}<span class="race-tag city">📍 ${r.location}</span></div>
+        </div>
+      </div>
+      ${r.description ? `<p class="race-desc">${r.description}</p>` : ''}
+      ${r.link ? `<a href="${r.link}" target="_blank" rel="noopener" class="race-link">🔗 Ver inscrições</a>` : ''}
+    </div>`;
+  }).join('');
+
+  listEl.innerHTML += `<div class="races-disclaimer">📍 Dados de <a href="https://esportividade.com.br/corrida-de-rua/" target="_blank" style="color:var(--blue-300)">esportividade.com.br</a></div>`;
+}
+
+// ── PLACAR ────────────────────────────────────────────────
+async function loadLeaderboard() {
+  const { db, collection, getDocs, query, orderBy, limit } = window.__firebase;
+  const listEl = document.getElementById('comm-leaderboard-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Carregando...</p>';
+
+  // Tabs de placar
+  document.querySelectorAll('.leader-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.leader-tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      renderLeaderboard(t.dataset.leader);
+    });
+  });
+
+  try {
+    const q = query(collection(db, 'users'), orderBy('totalDistance', 'desc'), limit(20));
+    const snap = await getDocs(q);
+    const users = [];
+    snap.forEach(d => users.push({ id: d.id, ...d.data() }));
+    window._leaderboardUsers = users;
+    renderLeaderboard('distance');
+  } catch (e) {
+    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Erro ao carregar.</p>';
+  }
+}
+
+function renderLeaderboard(type) {
+  const listEl = document.getElementById('comm-leaderboard-list');
+  const users = window._leaderboardUsers || [];
+  if (!listEl || users.length === 0) return;
+
+  const sorted = [...users].sort((a, b) => {
+    if (type === 'distance') return (b.totalDistance || 0) - (a.totalDistance || 0);
+    if (type === 'runs') return (b.totalRuns || 0) - (a.totalRuns || 0);
+    if (type === 'time') return (b.totalDuration || 0) - (a.totalDuration || 0);
+    return 0;
+  });
+
+  const medals = ['🥇', '🥈', '🥉'];
+  listEl.innerHTML = sorted.slice(0, 10).map((u, i) => {
+    const isMe = u.id === State.user?.uid;
+    let value = '';
+    if (type === 'distance') value = `${(u.totalDistance || 0).toFixed(1)} km`;
+    if (type === 'runs') value = `${u.totalRuns || 0} corridas`;
+    if (type === 'time') value = formatDuration(u.totalDuration || 0);
+
+    return `<div class="ranking-item ${i < 3 ? 'top-' + (i + 1) : ''} ${isMe ? 'me' : ''}">
+      <div class="rank-pos">${medals[i] || i + 1}</div>
+      <img class="user-avatar" style="width:40px;height:40px" src="${u.photoURL || getAvatarUrl(u.name || 'U')}" alt="${u.name}" onerror="this.src='${getAvatarUrl(u.name || 'U')}'" />
+      <div class="ranking-user-info">
+        <div class="name">${u.name || 'Atleta'} ${isMe ? '<span style="color:var(--blue-300);font-size:11px">· você</span>' : ''}</div>
+        <div class="detail">${u.totalRuns || 0} atividades</div>
+      </div>
+      <div class="ranking-value">${value}</div>
+    </div>`;
+  }).join('');
+}
 
 // ════════════════════════════════════════════════════════
 // RANKING
@@ -1383,9 +1408,8 @@ document.querySelectorAll('.ranking-tab').forEach(tab => {
 // ════════════════════════════════════════════════════════
 async function loadProgress() {
   const { db, collection, getDocs, query, orderBy, where } = window.__firebase;
-  const summaryEl = document.getElementById('progress-summary');
   const listEl = document.getElementById('progress-list');
-
+  const summaryEl = document.getElementById('progress-summary');
   if (!State.user) return;
 
   listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Carregando...</p>';
@@ -1393,67 +1417,161 @@ async function loadProgress() {
 
   try {
     let activities = [];
-
-    // Tenta com índice composto primeiro
     try {
-      const q = query(
-        collection(db, 'activities'),
-        where('userId', '==', State.user.uid),
-        orderBy('timestamp', 'desc')
-      );
+      const q = query(collection(db, 'activities'), where('userId', '==', State.user.uid), orderBy('timestamp', 'desc'));
       const snap = await getDocs(q);
       snap.forEach(d => activities.push({ id: d.id, ...d.data() }));
-    } catch (indexErr) {
-      // Índice não existe ainda — busca só por userId e ordena no cliente
-      console.warn('Índice composto não criado, usando fallback:', indexErr.message);
-      const q2 = query(
-        collection(db, 'activities'),
-        where('userId', '==', State.user.uid)
-      );
+    } catch {
+      const q2 = query(collection(db, 'activities'), where('userId', '==', State.user.uid));
       const snap2 = await getDocs(q2);
       snap2.forEach(d => activities.push({ id: d.id, ...d.data() }));
-      // Ordena por timestamp decrescente no cliente
-      activities.sort((a, b) => {
-        const ta = a.timestamp?.seconds || a.timestamp || 0;
-        const tb = b.timestamp?.seconds || b.timestamp || 0;
-        return tb - ta;
-      });
+      activities.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
     }
 
-    // Summary totais
     const totalDist = activities.reduce((s, a) => s + (a.distance || 0), 0);
     const totalTime = activities.reduce((s, a) => s + (a.duration || 0), 0);
     const totalCal = activities.reduce((s, a) => s + (a.calories || 0), 0);
+    const totalRuns = activities.length;
+
+    // ── Semana atual ──────────────────────────────────────
+    const now = new Date();
+    const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    const weekActivities = activities.filter(a => {
+      const d = new Date(a.date || 0);
+      return d >= weekStart;
+    });
+    const weekTarget = 3;
+    const weekPct = Math.min(100, Math.round((weekActivities.length / weekTarget) * 100));
+
+    // ── Série de semanas ──────────────────────────────────
+    const weeksWithActivity = new Set();
+    activities.forEach(a => {
+      const d = new Date(a.date || 0);
+      const weekKey = `${d.getFullYear()}-W${Math.ceil(d.getDate() / 7)}`;
+      weeksWithActivity.add(weekKey);
+    });
+
+    // ── Gráfico anual por mês ─────────────────────────────
+    const monthlyData = Array(12).fill(0);
+    const monthlyDist = Array(12).fill(0);
+    const currentYear = now.getFullYear();
+    activities.forEach(a => {
+      const d = new Date(a.date || 0);
+      if (d.getFullYear() === currentYear) {
+        monthlyData[d.getMonth()]++;
+        monthlyDist[d.getMonth()] += a.distance || 0;
+      }
+    });
+    const maxMonth = Math.max(...monthlyData, 1);
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const yearDist = monthlyDist.reduce((s, v) => s + v, 0);
+    const yearRuns = monthlyData.reduce((s, v) => s + v, 0);
+    const yearTime = activities.filter(a => new Date(a.date || 0).getFullYear() === currentYear)
+      .reduce((s, a) => s + (a.duration || 0), 0);
+
+    // ── Metas pessoais ────────────────────────────────────
+    const weeklyGoal = 3;   // atividades/semana
+    const monthlyGoal = 20;  // km/mês
+    const currentMonthRuns = monthlyData[now.getMonth()];
+    const currentMonthDist = monthlyDist[now.getMonth()];
 
     summaryEl.innerHTML = `
-      <div class="progress-stat"><div class="val">${activities.length}</div><div class="lbl">Atividades</div></div>
-      <div class="progress-stat"><div class="val">${totalDist.toFixed(1)}</div><div class="lbl">km totais</div></div>
-      <div class="progress-stat"><div class="val">${formatDuration(totalTime)}</div><div class="lbl">Tempo total</div></div>
-      <div class="progress-stat"><div class="val">${Math.round(totalCal)}</div><div class="lbl">kcal gastas</div></div>
+      <!-- Esta Semana -->
+      <div class="progress-week-section">
+        <div class="progress-week-header">
+          <span>Esta semana</span>
+          <span class="progress-week-count">${weekActivities.length} / ${weekTarget} atividades</span>
+        </div>
+        <div class="progress-week-bar-wrap">
+          <div class="progress-week-bar" style="width:${weekPct}%"></div>
+        </div>
+        <div class="progress-week-dots">
+          ${Array(weekTarget).fill(0).map((_, i) =>
+      `<div class="week-dot ${i < weekActivities.length ? 'filled' : ''}"></div>`
+    ).join('')}
+        </div>
+      </div>
+
+      <!-- Metas -->
+      <div class="progress-goals-section">
+        <h3 class="progress-section-title">🎯 Minhas Metas</h3>
+        <div class="goal-card">
+          <div class="goal-info">
+            <span class="goal-label">Meta semanal</span>
+            <span class="goal-value">${currentMonthRuns} / ${weeklyGoal} atividades</span>
+          </div>
+          <div class="goal-bar-wrap"><div class="goal-bar" style="width:${Math.min(100, (currentMonthRuns / weeklyGoal) * 100)}%"></div></div>
+        </div>
+        <div class="goal-card">
+          <div class="goal-info">
+            <span class="goal-label">Meta mensal de distância</span>
+            <span class="goal-value">${currentMonthDist.toFixed(1)} / ${monthlyGoal} km</span>
+          </div>
+          <div class="goal-bar-wrap"><div class="goal-bar blue" style="width:${Math.min(100, (currentMonthDist / monthlyGoal) * 100)}%"></div></div>
+        </div>
+      </div>
+
+      <!-- Série -->
+      <div class="progress-streak-section">
+        <h3 class="progress-section-title">🔥 Série</h3>
+        <div class="streak-row">
+          <div class="streak-card"><div class="streak-val">${weeksWithActivity.size}</div><div class="streak-lbl">Semanas ativas</div></div>
+          <div class="streak-card"><div class="streak-val">${totalRuns}</div><div class="streak-lbl">Atividades totais</div></div>
+          <div class="streak-card"><div class="streak-val">${totalDist.toFixed(0)}</div><div class="streak-lbl">km totais</div></div>
+        </div>
+      </div>
+
+      <!-- Estatísticas anuais -->
+      <div class="progress-stats-section">
+        <div class="progress-stats-header">
+          <h3 class="progress-section-title">📊 Distância (km) — ${currentYear}</h3>
+        </div>
+        <div class="year-chart">
+          ${months.map((m, i) => `
+            <div class="year-bar-col">
+              <div class="year-bar-wrap">
+                <div class="year-bar" style="height:${monthlyData[i] > 0 ? Math.max(8, Math.round((monthlyData[i] / maxMonth) * 80)) : 0}px" title="${monthlyDist[i].toFixed(1)} km"></div>
+              </div>
+              <span class="year-bar-label">${m}</span>
+            </div>`).join('')}
+        </div>
+        <div class="year-totals">
+          <div class="year-total-item"><div class="year-total-val">${yearRuns}</div><div class="year-total-lbl">Atividades</div></div>
+          <div class="year-total-item"><div class="year-total-val">${formatDuration(yearTime)}</div><div class="year-total-lbl">Tempo total</div></div>
+          <div class="year-total-item"><div class="year-total-val">${yearDist.toFixed(1)}</div><div class="year-total-lbl">km</div></div>
+        </div>
+      </div>
     `;
 
+    // ── Atividades recentes ───────────────────────────────
     if (activities.length === 0) {
       listEl.innerHTML = '<p style="padding:40px 20px;color:var(--text-muted);text-align:center">Nenhuma atividade ainda.<br>Complete sua primeira corrida! 🏃</p>';
       return;
     }
 
-    listEl.innerHTML = activities.map(a => `
-      <div class="history-card" onclick="openActivityDetail('${a.id}')">
-        <div class="history-card-header">
-          <span class="history-type-badge ${a.type || 'running'}">${a.type === 'walking' ? '🚶 Caminhada' : '🏃 Corrida'}</span>
-          <span class="history-date">${formatDateFull(a.date)}</span>
-        </div>
-        <div class="history-main-stat">${(a.distance || 0).toFixed(2)} <span>km</span></div>
-        <div class="history-details">
-          <div class="history-detail"><div class="v">${formatDuration(a.duration || 0)}</div><div class="l">Duração</div></div>
-          <div class="history-detail"><div class="v">${a.pace || '--:--'}</div><div class="l">Ritmo</div></div>
-          <div class="history-detail"><div class="v">${Math.round(a.calories || 0)}</div><div class="l">kcal</div></div>
-        </div>
-      </div>
-    `).join('');
+    listEl.innerHTML = `<h3 class="progress-section-title" style="padding:0 16px 12px">📋 Atividades Recentes</h3>` +
+      activities.map(a => `
+        <div class="history-card" onclick="openActivityDetail('${a.id}')">
+          <div class="history-card-header">
+            <span class="history-type-badge ${a.type || 'running'}">${a.type === 'walking' ? '🚶 Caminhada' : '🏃 Corrida'}</span>
+            <span class="history-date">${formatDateFull(a.date)}</span>
+          </div>
+          <div class="history-main-stat">${(a.distance || 0).toFixed(2)} <span>km</span></div>
+          <div class="history-details">
+            <div class="history-detail"><div class="v">${formatDuration(a.duration || 0)}</div><div class="l">Duração</div></div>
+            <div class="history-detail"><div class="v">${a.pace || '--:--'}</div><div class="l">Ritmo</div></div>
+            <div class="history-detail"><div class="v">${Math.round(a.calories || 0)}</div><div class="l">kcal</div></div>
+          </div>
+          ${a.kmSplits && a.kmSplits.length > 0 ? `
+          <div class="history-splits">
+            ${a.kmSplits.map(s => `<span class="split-badge">KM${s.km} ${s.pace}</span>`).join('')}
+          </div>` : ''}
+        </div>`
+      ).join('');
   } catch (e) {
     console.error('loadProgress error:', e);
-    listEl.innerHTML = `<p style="padding:20px;color:var(--text-muted);text-align:center">Erro: ${e.message}<br><small>Verifique as regras do Firestore.</small></p>`;
+    listEl.innerHTML = `<p style="padding:20px;color:var(--text-muted);text-align:center">Erro: ${e.message}</p>`;
   }
 }
 
