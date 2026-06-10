@@ -2055,105 +2055,157 @@ function setupRaces() {
 }
 
 // ── Dados reais extraídos do Esportividade (São Paulo e Guarulhos) ─────────
-// Fonte: https://esportividade.com.br/corrida-de-rua/
-// Atualizado em: Junho 2026
+// ── Database de eventos reais ──────────────────────────
+// Fontes: Esportividade, Prefeitura SP (SEME), Brasil Que Corre, Olympics.com
+// Atualizado: Junho 2026
 const RACES_DATABASE = {
   'são paulo': [
-    {
-      name: 'Wine Night Run para Solteiros – Orla TotalPass – Parque Villa-Lobos',
-      date: '05/06/2026', day: '05', month: 'JUN',
-      distances: ['5km'], type: 'Corrida Noturna',
-      location: 'Parque Villa-Lobos — São Paulo',
-      description: 'Corrida noturna temática no Parque Villa-Lobos. Evento especial para solteiros com kit exclusivo.',
-      link: 'https://esportividade.com.br/evento/wine-night-run-para-solteiros-orla-totalpass-parque-villa-lobos-05-06-2026/',
-      confirmed: true,
-    },
-    {
-      name: 'Corrida Atleta de Cristo Run – Parque Ecológico do Tietê',
-      date: '07/06/2026', day: '07', month: 'JUN',
-      distances: ['5km', '10km'], type: 'Corrida de Rua',
-      location: 'Parque Ecológico do Tietê — Zona Leste, São Paulo',
-      description: '2ª edição da corrida Atleta de Cristo Run. Provas de 5 km, 10 km e caminhada de 5 km.',
-      link: 'https://esportividade.com.br/evento/corrida-atleta-de-cristo-run-parque-ecologico-do-tiete-7-de-junho-de-2026/',
-      confirmed: true,
-    },
-    {
-      name: 'Corrida Kazamigas 2026 – USP',
-      date: '07/06/2026', day: '07', month: 'JUN',
-      distances: ['5km', '10km'], type: 'Corrida de Rua',
-      location: 'Campus USP — São Paulo',
-      description: 'Corrida universitária no campus da USP. Evento tradicional da comunidade acadêmica paulistana.',
-      link: 'https://esportividade.com.br/evento/corrida-kazamigas-2026-usp-sao-paulo/',
-      confirmed: true,
-    },
-    {
-      name: 'Corrida do He-Man 2026 – Parque Villa-Lobos',
-      date: '07/06/2026', day: '07', month: 'JUN',
-      distances: ['5km', '10km'], type: 'Corrida de Rua',
-      location: 'Parque Villa-Lobos — São Paulo',
-      description: 'Corrida temática baseada na franquia He-Man. Fantasias são incentivadas, event fun run.',
-      link: 'https://esportividade.com.br/evento/corrida-do-he-man-2026-parque-villa-lobos-sao-paulo/',
-      confirmed: true,
-    },
-    {
-      name: 'Parque do Trote – Circuito Popular de Corrida de São Paulo 2026',
-      date: '07/06/2026', day: '07', month: 'JUN',
-      distances: ['5km'], type: 'Corrida Popular / Gratuita',
-      location: 'Zona Norte — São Paulo',
-      description: 'Corrida gratuita de 5 km do Circuito Popular de SP, chegando agora à zona norte da cidade.',
-      link: 'https://esportividade.com.br/evento/parque-do-trote-circuito-popular-de-corrida-de-sao-paulo-2026/',
-      confirmed: true,
-    },
-    {
-      name: 'Mulheres em Movimento 2026 – Parque do Carmo',
-      date: '07/06/2026', day: '07', month: 'JUN',
-      distances: ['5km'], type: 'Corrida Feminina',
-      location: 'Parque do Carmo — Zona Leste, São Paulo',
-      description: 'Corrida feminina com kit gratuito no Parque do Carmo. Evento inclusivo para mulheres de todas as idades.',
-      link: 'https://esportividade.com.br/evento/mulheres-em-movimento-2026-com-kit-gratuito-parque-do-carmo/',
-      confirmed: true,
-    },
-    {
-      name: 'Urban Walk 2026 – Parque Villa-Lobos',
-      date: '13/06/2026', day: '13', month: 'JUN',
-      distances: ['5km', '10km'], type: 'Caminhada / Corrida',
-      location: 'Parque Villa-Lobos — São Paulo',
-      description: 'Evento de caminhada e corrida urbana no Parque Villa-Lobos, unindo saúde e bem-estar.',
-      link: 'https://esportividade.com.br/corrida-de-rua/',
-      confirmed: true,
-    },
-    {
-      name: 'Nike SP City Marathon 2026',
-      date: '2026', day: '—', month: 'A confirmar',
-      distances: ['10km', '21km', '42km'], type: 'Meia Maratona / Maratona',
-      location: 'São Paulo — SP',
-      description: 'A Nike SP City Marathon muda percurso em 2026. Nike também realiza treinos gratuitos de preparação.',
-      link: 'https://esportividade.com.br/nike-sp-city-marathon-percurso-muda-para-2026-e-nike-realiza-treinos-gratis/',
-      confirmed: false,
-    },
+    { name: 'Treino gratuito Vem Com Nóis – Av. Paulista', date: '10/06/2026', day: '10', month: 'JUN', distances: ['5km'], type: 'Treino Gratuito', location: 'Av. Paulista — São Paulo', description: 'Treino noturno gratuito na Av. Paulista, ponto de encontro Provisório Bar.', link: 'https://esportividade.com.br/evento/treino-gratuito-de-corrida-do-vem-com-nois-na-av-paulista-10-06-2026/', confirmed: true },
+    { name: 'adidas Runners – Treino gratuito no Ceret', date: '11/06/2026', day: '11', month: 'JUN', distances: ['5km', '10km'], type: 'Treino Gratuito', location: 'CERET — Zona Leste, São Paulo', description: 'Treino gratuito do grupo adidas Runners no CERET.', link: 'https://esportividade.com.br/evento/adidas-runners-treino-gratuito-no-ceret-11-06-2026/', confirmed: true },
+    { name: 'Urban Walk 2026 – Parque Villa-Lobos', date: '13/06/2026', day: '13', month: 'JUN', distances: ['5km', '10km'], type: 'Caminhada', location: 'Parque Villa-Lobos — São Paulo', description: 'Evento de caminhada e corrida urbana no Parque Villa-Lobos.', link: 'https://esportividade.com.br/evento/urban-walk-2026-parque-villa-lobos-sao-paulo/', confirmed: true },
+    { name: 'Corrida Copa do Mundo no Ceret 2026', date: '13/06/2026', day: '13', month: 'JUN', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'CERET — Zona Leste, São Paulo', description: 'Corrida temática Copa do Mundo no CERET.', link: 'https://esportividade.com.br/evento/corrida-copa-do-mundo-no-ceret-2026-sao-paulo/', confirmed: true },
+    { name: 'VEJA Shift Run – Treino gratuito', date: '13/06/2026', day: '13', month: 'JUN', distances: ['5km'], type: 'Treino Gratuito', location: 'VEJA Oscar Freire — São Paulo', description: 'Treino gratuito de corrida com a VEJA na Oscar Freire.', link: 'https://esportividade.com.br/evento/veja-shift-run-treino-gratuito-de-corrida-13-06-2026/', confirmed: true },
+    { name: 'Live! Run XP – Etapa Indaiatuba (Junho)', date: '21/06/2026', day: '21', month: 'JUN', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Indaiatuba — SP', description: 'Etapa de junho do circuito Live! Run XP em Indaiatuba.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+    { name: 'Live! Run XP – Etapa Jundiaí (Junho)', date: '28/06/2026', day: '28', month: 'JUN', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Jundiaí — SP', description: 'Etapa de junho do circuito Live! Run XP em Jundiaí.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+    { name: 'Live! Run XP – Etapa São Paulo (Julho)', date: '12/07/2026', day: '12', month: 'JUL', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'São Paulo — SP', description: 'Etapa de julho do circuito Live! Run XP em São Paulo.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+    { name: 'Live! Run XP – Etapa Ribeirão Preto (Julho)', date: '19/07/2026', day: '19', month: 'JUL', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Ribeirão Preto — SP', description: 'Etapa de julho do circuito Live! Run XP em Ribeirão Preto.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+    { name: 'Live! Run XP – Etapa Sorocaba (Julho)', date: '26/07/2026', day: '26', month: 'JUL', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Sorocaba — SP', description: 'Etapa de julho do circuito Live! Run XP em Sorocaba.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+    { name: 'Live! Run XP – Etapa São Paulo (Agosto)', date: '16/08/2026', day: '16', month: 'AGO', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'São Paulo — SP', description: 'Etapa de agosto do circuito Live! Run XP em São Paulo.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+    { name: 'Netshoes Run', date: '23/08/2026', day: '23', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Parque do Povo — Marginal Pinheiros, São Paulo', description: 'Corrida oficial Netshoes no Parque do Povo.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+    { name: 'Todateen Night Run 2026', date: '29/08/2026', day: '29', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida Noturna', location: 'Sambódromo do Anhembi — São Paulo', description: 'Corrida noturna Todateen no icônico Sambódromo do Anhembi.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+    { name: 'Run The Bridge', date: '30/08/2026', day: '30', month: 'AGO', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Ponte Estaiada — Marginal Pinheiros, São Paulo', description: 'Corrida com largada na icônica Ponte Estaiada da Marginal Pinheiros.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+    { name: 'Palmeiras Run', date: '30/08/2026', day: '30', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Allianz Parque — São Paulo', description: 'Corrida oficial do Palmeiras com chegada no Allianz Parque.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+    { name: '19ª Corrida Juventus Viva a Mooca', date: '30/08/2026', day: '30', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Clube Juventus — Mooca, São Paulo', description: 'Tradicional corrida do Clube Atlético Juventus no bairro da Mooca.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+    { name: 'Santander Track&Fields – Obelisco Ibirapuera', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Obelisco do Ibirapuera — São Paulo', description: 'Etapa da série Santander T&F no Obelisco do Ibirapuera.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+    { name: 'Santander Track&Fields – Esporte Clube Pinheiros', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Esporte Clube Pinheiros — São Paulo', description: 'Etapa da série Santander T&F no Esporte Clube Pinheiros.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+    { name: 'Live! Run XP – Etapa São Paulo (Setembro)', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'São Paulo — SP', description: 'Etapa de setembro do circuito Live! Run XP em São Paulo.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+    { name: 'Maratona Internacional de SP (FILA) – USP', date: '20/09/2026', day: '20', month: 'SET', distances: ['5km', '10km', '21km', '42km'], type: 'Maratona', location: 'Campus USP — São Paulo', description: 'Maratona Internacional de São Paulo da FILA, uma das maiores corridas do Brasil.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+    { name: 'Santander Track&Fields – JK Iguatemi III', date: '11/10/2026', day: '11', month: 'OUT', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Shopping JK Iguatemi — São Paulo', description: 'Terceira etapa do T&F Series no JK Iguatemi, com opção de 21km.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+    { name: 'Athenas Run Longer', date: '18/10/2026', day: '18', month: 'OUT', distances: ['7km', '14km', '21km', '28km'], type: 'Corrida de Rua', location: 'Parque do Povo — Marginal Pinheiros, São Paulo', description: 'Corrida especial Athenas com distâncias longas: 7, 14, 21 e 28km.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+    { name: 'Santander Track&Fields – Center Norte III', date: '18/10/2026', day: '18', month: 'OUT', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Shopping Center Norte — São Paulo', description: 'Etapa da série Santander T&F no Shopping Center Norte.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+    { name: 'Santander Track&Fields – Pátio Higienópolis', date: '19/10/2026', day: '19', month: 'OUT', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Praça Charles Miller — São Paulo', description: 'Etapa da série Santander T&F com largada na Praça Charles Miller.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+    { name: 'Nike SP City Marathon 2026', date: '01/11/2026', day: '01', month: 'NOV', distances: ['10km', '21km', '42km'], type: 'Maratona', location: 'São Paulo — SP', description: 'A Nike SP City Marathon 2026 com percurso reformulado. Uma das corridas mais aguardadas do ano.', link: 'https://esportividade.com.br/nike-sp-city-marathon-percurso-muda-para-2026-e-nike-realiza-treinos-gratis/', confirmed: false },
+    { name: 'Circuito das Estações – Verão', date: '15/11/2026', day: '15', month: 'NOV', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Praça Charles Miller — São Paulo', description: 'Etapa de Verão do tradicional Circuito das Estações na Praça Charles Miller.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+    { name: 'Corrida Internacional de São Silvestre', date: '31/12/2026', day: '31', month: 'DEZ', distances: ['15km'], type: 'Corrida Internacional', location: 'Av. Paulista — São Paulo', description: 'A mais tradicional corrida de rua do Brasil na Av. Paulista, disputada no último dia do ano desde 1924.', link: 'https://www.saosilvestre.com.br/', confirmed: true },
   ],
   'guarulhos': [
-    {
-      name: 'Corridas em Guarulhos — Ver calendário completo',
-      date: '', day: '📅', month: 'SP',
-      distances: ['5km', '10km', '21km'],
-      type: 'Calendário',
-      location: 'Guarulhos — SP',
-      description: 'Acesse o calendário completo de corridas em Guarulhos e região metropolitana de São Paulo no site Esportividade.',
-      link: 'https://esportividade.com.br/corrida-de-rua/',
-      confirmed: true,
-    },
-    {
-      name: 'Buscar corridas em Guarulhos 2026',
-      date: '', day: '🔍', month: 'Google',
-      distances: [],
-      type: 'Pesquisa',
-      location: 'Guarulhos — SP',
-      description: 'Toque para buscar todos os eventos de corrida em Guarulhos diretamente no Google.',
-      link: 'https://www.google.com/search?q=corridas+de+rua+guarulhos+2026',
-      confirmed: false,
-    },
+    { name: 'Corrida Rotary Guarulhos', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Guarulhos — SP', description: 'Corrida organizada pelo Rotary Club de Guarulhos.', link: 'https://brasilquecorre.com/saopaulo', confirmed: true },
+    { name: 'Calendário completo de Guarulhos — Esportividade', date: '', day: '📅', month: 'SP', distances: ['5km', '10km', '21km'], type: 'Calendário', location: 'Guarulhos — SP', description: 'Acesse o calendário completo de corridas na região metropolitana de SP, incluindo Guarulhos.', link: 'https://esportividade.com.br/corrida-de-rua/', confirmed: true },
+    { name: 'Buscar corridas em Guarulhos 2026', date: '', day: '🔍', month: 'Google', distances: [], type: 'Pesquisa', location: 'Guarulhos — SP', description: 'Toque para buscar eventos de corrida em Guarulhos no Google.', link: 'https://www.google.com/search?q=corridas+de+rua+guarulhos+2026', confirmed: false },
   ],
+};
+
+// ── Paginação de eventos ───────────────────────────────
+const EVENTS_PAGE_SIZE = 5;
+let _eventsPage = 0;
+let _eventsAll = [];
+
+async function searchRaces(city) {
+  const loadingEl = document.getElementById('races-loading');
+  const emptyEl = document.getElementById('races-empty');
+  const listEl = document.getElementById('races-list');
+
+  emptyEl.classList.add('hidden');
+  listEl.innerHTML = '';
+  loadingEl.classList.remove('hidden');
+  document.getElementById('races-loading-city').textContent = city;
+
+  await new Promise(r => setTimeout(r, 400));
+
+  const cityKey = city.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+  let races = null;
+  for (const key of Object.keys(RACES_DATABASE)) {
+    const nk = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (cityKey.includes(nk) || nk.includes(cityKey)) { races = RACES_DATABASE[key]; break; }
+  }
+
+  if (races) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    _eventsAll = races
+      .filter(r => {
+        if (!r.date || r.date.length < 8) return true;
+        const [d, m, y] = r.date.split('/');
+        return new Date(`${y}-${m}-${d}`) >= today;
+      })
+      .sort((a, b) => {
+        if (!a.date || a.date.length < 8) return 1;
+        if (!b.date || b.date.length < 8) return -1;
+        const [da, ma, ya] = a.date.split('/');
+        const [db2, mb, yb] = b.date.split('/');
+        return new Date(`${ya}-${ma}-${da}`) - new Date(`${yb}-${mb}-${db2}`);
+      });
+  } else {
+    _eventsAll = [
+      { name: `Calendário Esportividade`, date: '', day: '📅', month: '2026', distances: ['Várias'], type: 'Calendário', location: city, description: `Para ${city}, acesse o calendário completo no Esportividade.`, link: 'https://esportividade.com.br/corrida-de-rua/', confirmed: true },
+      { name: `Buscar corridas em ${city} 2026`, date: '', day: '🔍', month: 'Google', distances: [], type: 'Pesquisa', location: city, description: `Buscar eventos em ${city} no Google.`, link: `https://www.google.com/search?q=corridas+de+rua+${encodeURIComponent(city)}+2026`, confirmed: false },
+    ];
+  }
+
+  _eventsPage = 0;
+  renderEventsPage(listEl);
+  loadingEl.classList.add('hidden');
+}
+
+function renderEventsPage(listEl) {
+  const start = _eventsPage * EVENTS_PAGE_SIZE;
+  const page = _eventsAll.slice(start, start + EVENTS_PAGE_SIZE);
+  const hasMore = start + EVENTS_PAGE_SIZE < _eventsAll.length;
+  const remaining = _eventsAll.length - (start + EVENTS_PAGE_SIZE);
+
+  // Remove botão e disclaimer anteriores
+  listEl.querySelector('.btn-more-events')?.remove();
+  listEl.querySelector('.races-disclaimer')?.remove();
+
+  const html = page.map(r => {
+    const distTags = (r.distances || []).map(d => `<span class="race-tag dist">${d}</span>`).join('');
+    const linkEl = r.link
+      ? `<a href="${r.link}" target="_blank" rel="noopener noreferrer" class="race-link"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> Ver inscrições</a>`
+      : `<p class="race-no-link">🔍 Pesquise o nome do evento</p>`;
+    const unconfirmed = !r.confirmed ? `<span class="race-tag type" style="background:rgba(255,77,77,0.1);color:#FF8080">Não confirmado</span>` : '';
+    return `<div class="race-card">
+        <div class="race-card-top">
+          <div class="race-date-badge"><div class="day">${r.day || '--'}</div><div class="month">${r.month || '---'}</div></div>
+          <div class="race-info">
+            <div class="race-name">${r.name}</div>
+            <div class="race-meta">${distTags}${r.type ? `<span class="race-tag type">${r.type}</span>` : ''}${r.location ? `<span class="race-tag city">📍 ${r.location}</span>` : ''}${unconfirmed}</div>
+          </div>
+        </div>
+        ${r.description ? `<p class="race-desc">${r.description}</p>` : ''}${linkEl}
+      </div>`;
+  }).join('');
+
+  if (_eventsPage === 0) {
+    listEl.innerHTML = html;
+  } else {
+    listEl.insertAdjacentHTML('beforeend', html);
+  }
+
+  if (hasMore) {
+    listEl.insertAdjacentHTML('beforeend', `
+        <button class="btn-more-events" onclick="window.loadMoreEvents()">
+          📅 Ver mais ${Math.min(remaining, EVENTS_PAGE_SIZE)} eventos
+          <span style="color:var(--text-muted);font-size:11px;display:block;margin-top:3px">${remaining} evento${remaining !== 1 ? 's' : ''} restante${remaining !== 1 ? 's' : ''}</span>
+        </button>`);
+  }
+
+  listEl.insertAdjacentHTML('beforeend', `
+      <div class="races-disclaimer">
+        📍 Fontes: <a href="https://esportividade.com.br/corrida-de-rua/" target="_blank" style="color:var(--blue-300)">Esportividade</a> · <a href="https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722" target="_blank" style="color:var(--blue-300)">Prefeitura SP</a> · Confirme datas nos sites oficiais.
+      </div>`);
+}
+
+window.loadMoreEvents = function () {
+  _eventsPage++;
+  const listEl = document.getElementById('races-list');
+  renderEventsPage(listEl);
+  // Scroll suave até o novo conteúdo
+  setTimeout(() => {
+    const cards = listEl.querySelectorAll('.race-card');
+    const firstNew = cards[_eventsPage * EVENTS_PAGE_SIZE];
+    if (firstNew) firstNew.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
 };
 
 async function searchRaces(city) {

@@ -2627,3 +2627,28 @@ body {
   color: var(--text-muted);
   margin-top: 2px;
 }
+
+/* ── BOTÃO MAIS EVENTOS ──────────────────────────────────── */
+.btn-more-events {
+  width: 100%;
+  padding: 14px;
+  background: var(--surface2);
+  border: 1.5px dashed var(--blue-500);
+  border-radius: var(--radius-sm);
+  color: var(--blue-300);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: var(--transition);
+  margin-top: 4px;
+}
+
+.btn-more-events:hover {
+  background: rgba(26, 107, 240, 0.15);
+}
+
+.btn-more-events:active {
+  transform: scale(0.98);
+}
