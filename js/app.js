@@ -401,6 +401,8 @@ function setupApp() {
   loadRanking('distance');
   loadProfileData();
   setTimeout(checkCommunityNotifications, 3000);
+  // Verifica se havia corrida em andamento quando o app foi fechado
+  setTimeout(checkInterruptedActivity, 1500);
 }
 
 function updateHeaderUI() {
@@ -512,6 +514,7 @@ function setupActivityPage() {
 
   document.getElementById('btn-save-activity').addEventListener('click', saveActivity);
   document.getElementById('btn-discard-activity').addEventListener('click', () => {
+    localStorage.removeItem('pacerun_active_run');
     document.getElementById('modal-summary').classList.add('hidden');
     resetActivity();
   });
@@ -544,6 +547,7 @@ function startActivity() {
   State.activity.positions = [];
   State.activity.distance = 0;
   State.activity.speeds = [];
+  State.activity.recentSpeeds = []; // janela deslizante para pace suavizado
   State.activity.maxSpeed = 0;
   State.activity.photo = null;
 
@@ -559,8 +563,11 @@ function startActivity() {
   document.getElementById('map-idle').classList.add('hidden');
   document.querySelector('.gps-dot').classList.add('active');
 
-  // Timer
-  State.activity.intervalId = setInterval(updateActivityUI, 1000);
+  // Timer — salva estado no localStorage a cada segundo (Bug 1 fix)
+  State.activity.intervalId = setInterval(() => {
+    updateActivityUI();
+    persistActivityState();
+  }, 1000);
 
   // GPS Watch
   State.activity.watchId = navigator.geolocation.watchPosition(
@@ -568,6 +575,110 @@ function startActivity() {
     err => console.warn('GPS error:', err),
     { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
   );
+}
+
+// ── Persiste estado no localStorage para sobreviver fechamento do app ──
+function persistActivityState() {
+  if (!State.activity.running) return;
+  try {
+    localStorage.setItem('pacerun_active_run', JSON.stringify({
+      running: true,
+      startTime: State.activity.startTime,
+      pausedTime: State.activity.pausedTime,
+      distance: State.activity.distance,
+      speeds: State.activity.speeds.slice(-20), // últimas 20 leituras
+      maxSpeed: State.activity.maxSpeed,
+      type: State.activity.type,
+      positions: State.activity.positions.slice(-100), // últimas 100 posições
+      savedAt: Date.now(),
+    }));
+  } catch (e) { /* localStorage cheio, ignora */ }
+}
+
+// ── Verifica ao iniciar o app se havia corrida em andamento ──
+function checkInterruptedActivity() {
+  try {
+    const raw = localStorage.getItem('pacerun_active_run');
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+
+    // Considera corrida válida se foi salva há menos de 2 horas
+    const age = Date.now() - (saved.savedAt || 0);
+    if (!saved.running || age > 2 * 3600 * 1000) {
+      localStorage.removeItem('pacerun_active_run');
+      return;
+    }
+
+    // Mostra opção de retomar ou descartar
+    showInterruptedActivityModal(saved);
+  } catch (e) {
+    localStorage.removeItem('pacerun_active_run');
+  }
+}
+
+function showInterruptedActivityModal(saved) {
+  const dist = (saved.distance || 0).toFixed(2);
+  const elapsed = Math.round((Date.now() - saved.startTime - saved.pausedTime) / 1000);
+  const dur = formatDuration(elapsed);
+
+  // Cria modal dinâmico
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'modal-interrupted';
+  modal.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:48px;margin-bottom:8px">⚠️</div>
+        <h2 style="font-family:var(--font-display);font-size:22px;font-weight:800">Corrida interrompida</h2>
+        <p style="color:var(--text-secondary);margin-top:8px;font-size:14px">
+          O app foi fechado durante uma atividade.<br>
+          <strong style="color:var(--white)">${dist} km · ${dur}</strong> registrados.
+        </p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn-primary" id="btn-recover-run">Salvar atividade registrada</button>
+        <button class="btn-ghost btn-danger" id="btn-discard-interrupted">Descartar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  document.getElementById('btn-recover-run').addEventListener('click', () => {
+    // Reconstrói currentActivity a partir do estado salvo
+    const duration = Math.round((saved.savedAt - saved.startTime - saved.pausedTime) / 1000);
+    const avgSpeed = saved.distance > 0 && duration > 0 ? saved.distance / (duration / 3600) : 0;
+    const pace = avgSpeed > 0 ? 60 / avgSpeed : 0;
+    const paceMin = Math.floor(pace);
+    const paceSec = Math.round((pace - paceMin) * 60);
+
+    State.currentActivity = {
+      type: saved.type || 'running',
+      distance: saved.distance || 0,
+      duration,
+      avgSpeed,
+      maxSpeed: saved.maxSpeed || 0,
+      pace: avgSpeed > 0 ? `${paceMin}:${String(paceSec).padStart(2, '0')}` : '--:--',
+      calories: calcCaloriesStatic(saved.distance || 0, duration, State.userProfile?.weight || 70),
+      photo: null,
+      positions: saved.positions || [],
+      timestamp: saved.startTime,
+    };
+
+    localStorage.removeItem('pacerun_active_run');
+    modal.remove();
+    showSummaryModal(State.currentActivity);
+  });
+
+  document.getElementById('btn-discard-interrupted').addEventListener('click', () => {
+    localStorage.removeItem('pacerun_active_run');
+    modal.remove();
+  });
+}
+
+// Versão estática do calcCalories (sem depender de State.activity.type)
+function calcCaloriesStatic(distKm, durationSec, weight, type = 'running') {
+  const MET = type === 'running' ? 8.5 : 3.5;
+  return MET * weight * (durationSec / 3600);
 }
 
 function pauseActivity() {
@@ -595,11 +706,13 @@ function resumeActivity() {
 function handleStop() {
   if (!State.activity.running) return;
 
-  // Para tudo
   clearInterval(State.activity.intervalId);
   navigator.geolocation.clearWatch(State.activity.watchId);
   State.activity.running = false;
   State.activity.paused = false;
+
+  // Para de persistir — corrida foi encerrada pelo usuário
+  localStorage.removeItem('pacerun_active_run');
 
   // Reseta botões
   document.getElementById('icon-start').classList.remove('hidden');
@@ -643,7 +756,7 @@ function onPositionUpdate(pos) {
   if (positions.length > 0) {
     const last = positions[positions.length - 1];
     const d = haversine(last.lat, last.lng, latitude, longitude);
-    if (d > 0.005 && accuracy < 50) { // filtro de ruído GPS
+    if (d > 0.005 && accuracy < 50) {
       State.activity.distance += d;
       if (State.polyline) {
         State.polyline.addLatLng([latitude, longitude]);
@@ -651,15 +764,43 @@ function onPositionUpdate(pos) {
     }
   }
 
-  positions.push({ lat: latitude, lng: longitude });
+  positions.push({ lat: latitude, lng: longitude, ts: Date.now() });
 
-  // Velocidade
-  const currentSpeed = speed != null ? speed * 3.6 : 0;
+  // ── Velocidade instantânea suavizada (Bug 2 fix) ──────────
+  // Prioriza speed do GPS quando disponível e plausível
+  let currentSpeed = 0;
+  if (speed != null && speed >= 0) {
+    currentSpeed = speed * 3.6; // m/s → km/h
+  } else if (positions.length >= 2) {
+    // Calcula a partir das últimas 2 posições
+    const prev = positions[positions.length - 2];
+    const curr = positions[positions.length - 1];
+    const timeDiff = (curr.ts - prev.ts) / 1000; // segundos
+    const distKm = haversine(prev.lat, prev.lng, curr.lat, curr.lng);
+    if (timeDiff > 0 && distKm > 0) {
+      currentSpeed = (distKm / timeDiff) * 3600; // km/h
+    }
+  }
+
+  // Limita velocidade máxima plausível (100 km/h = sprint impossível)
+  currentSpeed = Math.min(currentSpeed, 35);
+
+  // Janela deslizante de 5 leituras para suavizar velocidade instantânea
+  if (!State.activity.recentSpeeds) State.activity.recentSpeeds = [];
+  if (currentSpeed > 0) {
+    State.activity.recentSpeeds.push(currentSpeed);
+    if (State.activity.recentSpeeds.length > 5) State.activity.recentSpeeds.shift();
+  }
+
+  // Velocidade suavizada = média da janela
+  const smoothSpeed = State.activity.recentSpeeds.length > 0
+    ? State.activity.recentSpeeds.reduce((a, b) => a + b, 0) / State.activity.recentSpeeds.length
+    : 0;
+
   if (currentSpeed > 0) State.activity.speeds.push(currentSpeed);
   if (currentSpeed > State.activity.maxSpeed) State.activity.maxSpeed = currentSpeed;
 
-  // Atualiza velocidade na UI
-  document.getElementById('act-speed').textContent = currentSpeed.toFixed(1);
+  document.getElementById('act-speed').textContent = smoothSpeed.toFixed(1);
   document.getElementById('act-max-speed').textContent = State.activity.maxSpeed.toFixed(1);
 
   // Move mapa
@@ -679,21 +820,34 @@ function onPositionUpdate(pos) {
 function updateActivityUI() {
   const elapsed = computeElapsed();
   const dist = State.activity.distance;
-  const avgSpeed = dist > 0 ? dist / (elapsed / 3600) : 0;
-  const pace = avgSpeed > 0 ? 60 / avgSpeed : 0;
-  const paceMin = Math.floor(pace);
-  const paceSec = Math.round((pace - paceMin) * 60);
+
+  // ── Pace suavizado (Bug 2 fix) ──────────────────────────
+  // Só calcula pace com distância mínima de 0.05 km para evitar valores absurdos
+  const MIN_DIST_FOR_PACE = 0.05;
+  let paceStr = '--:--';
+  let avgSpeed = 0;
+
+  if (dist >= MIN_DIST_FOR_PACE && elapsed > 10) {
+    avgSpeed = dist / (elapsed / 3600);
+    const pace = 60 / avgSpeed; // min/km
+    // Limita pace a valores humanamente plausíveis (1:00 a 30:00 min/km)
+    if (pace >= 1 && pace <= 30) {
+      const paceMin = Math.floor(pace);
+      const paceSec = Math.round((pace - paceMin) * 60);
+      paceStr = `${paceMin}:${String(paceSec).padStart(2, '0')}`;
+    }
+  }
 
   document.getElementById('act-distance').textContent = dist.toFixed(2);
   document.getElementById('act-duration').textContent = formatDuration(elapsed);
-  document.getElementById('act-pace').textContent = avgSpeed > 0
-    ? `${paceMin}:${String(paceSec).padStart(2, '0')}`
-    : '--:--';
+  document.getElementById('act-pace').textContent = paceStr;
   document.getElementById('act-calories').textContent = Math.round(calcCalories(dist, elapsed));
 
-  // Velocidade média
+  // Velocidade média histórica
   const speeds = State.activity.speeds;
-  const avgSpd = speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
+  const avgSpd = speeds.length > 0
+    ? speeds.reduce((a, b) => a + b, 0) / speeds.length
+    : 0;
   document.getElementById('act-avg-speed').textContent = avgSpd.toFixed(1);
 }
 
@@ -794,6 +948,7 @@ async function saveActivity() {
     }
 
     showToast('Atividade salva com sucesso! 🎉');
+    localStorage.removeItem('pacerun_active_run'); // limpa estado persistido
     document.getElementById('modal-summary').classList.add('hidden');
     resetActivity();
 
