@@ -395,8 +395,8 @@ function setupApp() {
   setupActivityPage();
   setupProfilePage();
   setupNotifications();
+  setupHamburgerMenu();
   setupRaces();
-  // Expõe RACES_DATABASE globalmente para a comunidade usar
   window.RACES_DATABASE = RACES_DATABASE;
   navigateTo('activity');
   loadFeed();
@@ -1336,53 +1336,53 @@ function renderLeaderboard(type) {
 // RANKING
 // ════════════════════════════════════════════════════════
 async function loadRanking(type = 'distance') {
-  const { db, collection, getDocs, query, orderBy, limit } = window.__firebase;
-  const listEl = document.getElementById('ranking-list');
-  listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Carregando...</p>';
+    const { db, collection, getDocs, query, orderBy, limit } = window.__firebase;
+    const listEl = document.getElementById('ranking-list');
+    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Carregando...</p>';
 
-  document.querySelectorAll('.ranking-tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.rank === type);
-  });
-
-  try {
-    const sortField = type === 'distance' ? 'distance' : 'avgSpeed';
-    const q = query(
-      collection(db, 'activities'),
-      orderBy(sortField, 'desc'),
-      limit(20)
-    );
-    const snap = await getDocs(q);
-    const activities = [];
-    snap.forEach(d => activities.push({ id: d.id, ...d.data() }));
-
-    // Agrupa por usuário (melhor resultado)
-    const byUser = {};
-    activities.forEach(a => {
-      if (!byUser[a.userId] || a[sortField] > byUser[a.userId][sortField]) {
-        byUser[a.userId] = a;
-      }
+    document.querySelectorAll('.ranking-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.rank === type);
     });
 
-    const ranked = Object.values(byUser)
-      .sort((a, b) => b[sortField] - a[sortField])
-      .slice(0, 10);
+    try {
+      const sortField = type === 'distance' ? 'distance' : 'avgSpeed';
+      const q = query(
+        collection(db, 'activities'),
+        orderBy(sortField, 'desc'),
+        limit(20)
+      );
+      const snap = await getDocs(q);
+      const activities = [];
+      snap.forEach(d => activities.push({ id: d.id, ...d.data() }));
 
-    if (ranked.length === 0) {
-      listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Sem atividades ainda. Seja o primeiro!</p>';
-      return;
-    }
+      // Agrupa por usuário (melhor resultado)
+      const byUser = {};
+      activities.forEach(a => {
+        if (!byUser[a.userId] || a[sortField] > byUser[a.userId][sortField]) {
+          byUser[a.userId] = a;
+        }
+      });
 
-    listEl.innerHTML = ranked.map((a, i) => {
-      const pos = i + 1;
-      const topClass = pos <= 3 ? `top-${pos}` : '';
-      const medals = ['🥇', '🥈', '🥉'];
-      const medal = medals[i] || pos;
+      const ranked = Object.values(byUser)
+        .sort((a, b) => b[sortField] - a[sortField])
+        .slice(0, 10);
 
-      const value = type === 'distance'
-        ? `${a.distance.toFixed(2)}<small>km</small>`
-        : `${a.pace}<small>/km</small>`;
+      if (ranked.length === 0) {
+        listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Sem atividades ainda. Seja o primeiro!</p>';
+        return;
+      }
 
-      return `
+      listEl.innerHTML = ranked.map((a, i) => {
+        const pos = i + 1;
+        const topClass = pos <= 3 ? `top-${pos}` : '';
+        const medals = ['🥇', '🥈', '🥉'];
+        const medal = medals[i] || pos;
+
+        const value = type === 'distance'
+          ? `${a.distance.toFixed(2)}<small>km</small>`
+          : `${a.pace}<small>/km</small>`;
+
+        return `
         <div class="ranking-item ${topClass}">
           <div class="rank-pos">${typeof medal === 'string' ? medal : pos}</div>
           <img class="user-avatar" style="width:40px;height:40px" src="${a.userPhotoURL || getAvatarUrl(a.userName || 'U')}" alt="${a.userName}" onerror="this.src='${getAvatarUrl(a.userName || 'U')}'" />
@@ -1393,90 +1393,90 @@ async function loadRanking(type = 'distance') {
           <div class="ranking-value">${value}</div>
         </div>
       `;
-    }).join('');
-  } catch (e) {
-    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Erro ao carregar ranking.</p>';
-  }
-}
-
-document.querySelectorAll('.ranking-tab').forEach(tab => {
-  tab.addEventListener('click', () => loadRanking(tab.dataset.rank));
-});
-
-// ════════════════════════════════════════════════════════
-// PROGRESS
-// ════════════════════════════════════════════════════════
-async function loadProgress() {
-  const { db, collection, getDocs, query, orderBy, where } = window.__firebase;
-  const listEl = document.getElementById('progress-list');
-  const summaryEl = document.getElementById('progress-summary');
-  if (!State.user) return;
-
-  listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Carregando...</p>';
-  summaryEl.innerHTML = '';
-
-  try {
-    let activities = [];
-    try {
-      const q = query(collection(db, 'activities'), where('userId', '==', State.user.uid), orderBy('timestamp', 'desc'));
-      const snap = await getDocs(q);
-      snap.forEach(d => activities.push({ id: d.id, ...d.data() }));
-    } catch {
-      const q2 = query(collection(db, 'activities'), where('userId', '==', State.user.uid));
-      const snap2 = await getDocs(q2);
-      snap2.forEach(d => activities.push({ id: d.id, ...d.data() }));
-      activities.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+      }).join('');
+    } catch (e) {
+      listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Erro ao carregar ranking.</p>';
     }
+  }
 
-    const totalDist = activities.reduce((s, a) => s + (a.distance || 0), 0);
-    const totalTime = activities.reduce((s, a) => s + (a.duration || 0), 0);
-    const totalCal = activities.reduce((s, a) => s + (a.calories || 0), 0);
-    const totalRuns = activities.length;
+  document.querySelectorAll('.ranking-tab').forEach(tab => {
+    tab.addEventListener('click', () => loadRanking(tab.dataset.rank));
+  });
 
-    // ── Semana atual ──────────────────────────────────────
-    const now = new Date();
-    const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
-    weekStart.setHours(0, 0, 0, 0);
-    const weekActivities = activities.filter(a => {
-      const d = new Date(a.date || 0);
-      return d >= weekStart;
-    });
-    const weekTarget = 3;
-    const weekPct = Math.min(100, Math.round((weekActivities.length / weekTarget) * 100));
+  // ════════════════════════════════════════════════════════
+  // PROGRESS
+  // ════════════════════════════════════════════════════════
+  async function loadProgress() {
+    const { db, collection, getDocs, query, orderBy, where } = window.__firebase;
+    const listEl = document.getElementById('progress-list');
+    const summaryEl = document.getElementById('progress-summary');
+    if (!State.user) return;
 
-    // ── Série de semanas ──────────────────────────────────
-    const weeksWithActivity = new Set();
-    activities.forEach(a => {
-      const d = new Date(a.date || 0);
-      const weekKey = `${d.getFullYear()}-W${Math.ceil(d.getDate() / 7)}`;
-      weeksWithActivity.add(weekKey);
-    });
+    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Carregando...</p>';
+    summaryEl.innerHTML = '';
 
-    // ── Gráfico anual por mês ─────────────────────────────
-    const monthlyData = Array(12).fill(0);
-    const monthlyDist = Array(12).fill(0);
-    const currentYear = now.getFullYear();
-    activities.forEach(a => {
-      const d = new Date(a.date || 0);
-      if (d.getFullYear() === currentYear) {
-        monthlyData[d.getMonth()]++;
-        monthlyDist[d.getMonth()] += a.distance || 0;
+    try {
+      let activities = [];
+      try {
+        const q = query(collection(db, 'activities'), where('userId', '==', State.user.uid), orderBy('timestamp', 'desc'));
+        const snap = await getDocs(q);
+        snap.forEach(d => activities.push({ id: d.id, ...d.data() }));
+      } catch {
+        const q2 = query(collection(db, 'activities'), where('userId', '==', State.user.uid));
+        const snap2 = await getDocs(q2);
+        snap2.forEach(d => activities.push({ id: d.id, ...d.data() }));
+        activities.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
       }
-    });
-    const maxMonth = Math.max(...monthlyData, 1);
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const yearDist = monthlyDist.reduce((s, v) => s + v, 0);
-    const yearRuns = monthlyData.reduce((s, v) => s + v, 0);
-    const yearTime = activities.filter(a => new Date(a.date || 0).getFullYear() === currentYear)
-      .reduce((s, a) => s + (a.duration || 0), 0);
 
-    // ── Metas pessoais ────────────────────────────────────
-    const weeklyGoal = 3;   // atividades/semana
-    const monthlyGoal = 20;  // km/mês
-    const currentMonthRuns = monthlyData[now.getMonth()];
-    const currentMonthDist = monthlyDist[now.getMonth()];
+      const totalDist = activities.reduce((s, a) => s + (a.distance || 0), 0);
+      const totalTime = activities.reduce((s, a) => s + (a.duration || 0), 0);
+      const totalCal = activities.reduce((s, a) => s + (a.calories || 0), 0);
+      const totalRuns = activities.length;
 
-    summaryEl.innerHTML = `
+      // ── Semana atual ──────────────────────────────────────
+      const now = new Date();
+      const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      const weekActivities = activities.filter(a => {
+        const d = new Date(a.date || 0);
+        return d >= weekStart;
+      });
+      const weekTarget = 3;
+      const weekPct = Math.min(100, Math.round((weekActivities.length / weekTarget) * 100));
+
+      // ── Série de semanas ──────────────────────────────────
+      const weeksWithActivity = new Set();
+      activities.forEach(a => {
+        const d = new Date(a.date || 0);
+        const weekKey = `${d.getFullYear()}-W${Math.ceil(d.getDate() / 7)}`;
+        weeksWithActivity.add(weekKey);
+      });
+
+      // ── Gráfico anual por mês ─────────────────────────────
+      const monthlyData = Array(12).fill(0);
+      const monthlyDist = Array(12).fill(0);
+      const currentYear = now.getFullYear();
+      activities.forEach(a => {
+        const d = new Date(a.date || 0);
+        if (d.getFullYear() === currentYear) {
+          monthlyData[d.getMonth()]++;
+          monthlyDist[d.getMonth()] += a.distance || 0;
+        }
+      });
+      const maxMonth = Math.max(...monthlyData, 1);
+      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const yearDist = monthlyDist.reduce((s, v) => s + v, 0);
+      const yearRuns = monthlyData.reduce((s, v) => s + v, 0);
+      const yearTime = activities.filter(a => new Date(a.date || 0).getFullYear() === currentYear)
+        .reduce((s, a) => s + (a.duration || 0), 0);
+
+      // ── Metas pessoais ────────────────────────────────────
+      const weeklyGoal = 3;   // atividades/semana
+      const monthlyGoal = 20;  // km/mês
+      const currentMonthRuns = monthlyData[now.getMonth()];
+      const currentMonthDist = monthlyDist[now.getMonth()];
+
+      summaryEl.innerHTML = `
       <!-- Esta Semana -->
       <div class="progress-week-section">
         <div class="progress-week-header">
@@ -1488,8 +1488,8 @@ async function loadProgress() {
         </div>
         <div class="progress-week-dots">
           ${Array(weekTarget).fill(0).map((_, i) =>
-      `<div class="week-dot ${i < weekActivities.length ? 'filled' : ''}"></div>`
-    ).join('')}
+        `<div class="week-dot ${i < weekActivities.length ? 'filled' : ''}"></div>`
+      ).join('')}
         </div>
       </div>
 
@@ -1544,14 +1544,14 @@ async function loadProgress() {
       </div>
     `;
 
-    // ── Atividades recentes ───────────────────────────────
-    if (activities.length === 0) {
-      listEl.innerHTML = '<p style="padding:40px 20px;color:var(--text-muted);text-align:center">Nenhuma atividade ainda.<br>Complete sua primeira corrida! 🏃</p>';
-      return;
-    }
+      // ── Atividades recentes ───────────────────────────────
+      if (activities.length === 0) {
+        listEl.innerHTML = '<p style="padding:40px 20px;color:var(--text-muted);text-align:center">Nenhuma atividade ainda.<br>Complete sua primeira corrida! 🏃</p>';
+        return;
+      }
 
-    listEl.innerHTML = `<h3 class="progress-section-title" style="padding:0 16px 12px">📋 Atividades Recentes</h3>` +
-      activities.map(a => `
+      listEl.innerHTML = `<h3 class="progress-section-title" style="padding:0 16px 12px">📋 Atividades Recentes</h3>` +
+        activities.map(a => `
         <div class="history-card" onclick="openActivityDetail('${a.id}')">
           <div class="history-card-header">
             <span class="history-type-badge ${a.type || 'running'}">${a.type === 'walking' ? '🚶 Caminhada' : '🏃 Corrida'}</span>
@@ -1568,22 +1568,22 @@ async function loadProgress() {
             ${a.kmSplits.map(s => `<span class="split-badge">KM${s.km} ${s.pace}</span>`).join('')}
           </div>` : ''}
         </div>`
-      ).join('');
-  } catch (e) {
-    console.error('loadProgress error:', e);
-    listEl.innerHTML = `<p style="padding:20px;color:var(--text-muted);text-align:center">Erro: ${e.message}</p>`;
+        ).join('');
+    } catch (e) {
+      console.error('loadProgress error:', e);
+      listEl.innerHTML = `<p style="padding:20px;color:var(--text-muted);text-align:center">Erro: ${e.message}</p>`;
+    }
   }
-}
 
-// Detalhe de atividade
-window.openActivityDetail = async function (id) {
-  const { db, doc, getDoc } = window.__firebase;
-  const snap = await getDoc(doc(db, 'activities', id));
-  if (!snap.exists()) return;
+  // Detalhe de atividade
+  window.openActivityDetail = async function (id) {
+    const { db, doc, getDoc } = window.__firebase;
+    const snap = await getDoc(doc(db, 'activities', id));
+    if (!snap.exists()) return;
 
-  const a = snap.data();
-  const content = document.getElementById('activity-detail-content');
-  content.innerHTML = `
+    const a = snap.data();
+    const content = document.getElementById('activity-detail-content');
+    content.innerHTML = `
     <h2 class="modal-title">${a.type === 'running' ? '🏃 Corrida' : '🚶 Caminhada'}</h2>
     <p style="text-align:center;color:var(--text-secondary);margin-bottom:20px">${formatDateFull(a.date)}</p>
     ${a.photoURL ? `<img src="${a.photoURL}" style="width:100%;border-radius:12px;margin-bottom:16px;max-height:200px;object-fit:cover" alt="foto" />` : ''}
@@ -1597,192 +1597,192 @@ window.openActivityDetail = async function (id) {
     </div>
   `;
 
-  // Botão compartilhar detalhe
-  document.getElementById('btn-share-from-detail').onclick = () => {
-    document.getElementById('modal-activity-detail').classList.add('hidden');
-    openShareModal({ ...a, distance: a.distance, duration: a.duration });
+    // Botão compartilhar detalhe
+    document.getElementById('btn-share-from-detail').onclick = () => {
+      document.getElementById('modal-activity-detail').classList.add('hidden');
+      openShareModal({ ...a, distance: a.distance, duration: a.duration });
+    };
+
+    document.getElementById('modal-activity-detail').classList.remove('hidden');
   };
 
-  document.getElementById('modal-activity-detail').classList.remove('hidden');
-};
+  document.getElementById('btn-close-detail')?.addEventListener('click', () => {
+    document.getElementById('modal-activity-detail').classList.add('hidden');
+  });
 
-document.getElementById('btn-close-detail')?.addEventListener('click', () => {
-  document.getElementById('modal-activity-detail').classList.add('hidden');
-});
+  // ════════════════════════════════════════════════════════
+  // PROFILE
+  // ════════════════════════════════════════════════════════
+  function loadProfileData() {
+    if (!State.user || !State.userProfile) return;
 
-// ════════════════════════════════════════════════════════
-// PROFILE
-// ════════════════════════════════════════════════════════
-function loadProfileData() {
-  if (!State.user || !State.userProfile) return;
+    const p = State.userProfile;
+    const name = p.name || State.user.displayName || 'Atleta';
+    const email = State.user.email || '';
 
-  const p = State.userProfile;
-  const name = p.name || State.user.displayName || 'Atleta';
-  const email = State.user.email || '';
+    document.getElementById('profile-name').textContent = name;
+    document.getElementById('profile-email').textContent = email;
+    document.getElementById('profile-name-input').value = name;
+    document.getElementById('profile-weight').value = p.weight || 70;
 
-  document.getElementById('profile-name').textContent = name;
-  document.getElementById('profile-email').textContent = email;
-  document.getElementById('profile-name-input').value = name;
-  document.getElementById('profile-weight').value = p.weight || 70;
+    // Adiciona bust de cache para garantir foto mais recente
+    const baseUrl = p.photoURL || getAvatarUrl(name);
+    const avatarUrl = p.photoURL
+      ? `${p.photoURL}?v=${Date.now()}`
+      : baseUrl;
 
-  // Adiciona bust de cache para garantir foto mais recente
-  const baseUrl = p.photoURL || getAvatarUrl(name);
-  const avatarUrl = p.photoURL
-    ? `${p.photoURL}?v=${Date.now()}`
-    : baseUrl;
+    document.getElementById('profile-avatar').src = avatarUrl;
+    document.getElementById('header-avatar').src = avatarUrl;
 
-  document.getElementById('profile-avatar').src = avatarUrl;
-  document.getElementById('header-avatar').src = avatarUrl;
-
-  document.getElementById('profile-stats-row').innerHTML = `
+    document.getElementById('profile-stats-row').innerHTML = `
     <div class="profile-stat"><div class="v">${p.totalRuns || 0}</div><div class="l">Corridas</div></div>
     <div class="profile-stat"><div class="v">${(p.totalDistance || 0).toFixed(1)}</div><div class="l">km totais</div></div>
     <div class="profile-stat"><div class="v">${formatDuration(p.totalDuration || 0)}</div><div class="l">Tempo</div></div>
   `;
-}
+  }
 
-function setupProfilePage() {
-  // Avatar
-  document.getElementById('btn-change-avatar').addEventListener('click', () => {
-    document.getElementById('avatar-file-input').click();
-  });
-
-  document.getElementById('avatar-file-input').addEventListener('change', async e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const url = await readFileAsDataURL(file);
-    await uploadAvatar(url);
-  });
-
-  // Save profile
-  document.getElementById('btn-save-profile').addEventListener('click', saveProfile);
-
-  // Logout
-  document.getElementById('btn-logout').addEventListener('click', async () => {
-    const { auth, signOut } = window.__firebase;
-    await signOut(auth);
-    showToast('Até logo! 👋');
-  });
-}
-
-async function uploadAvatar(dataURL) {
-  const CLOUD_NAME = 'dzesgiw8e';
-  const UPLOAD_PRESET = 'pacerun_unsigned';
-
-  const { db, doc, updateDoc } = window.__firebase;
-
-  try {
-    showToast('Enviando foto...');
-
-    // Usa timestamp no public_id para garantir nova imagem a cada upload
-    const ts = Date.now();
-    const formData = new FormData();
-    formData.append('file', dataURL);
-    formData.append('upload_preset', UPLOAD_PRESET);
-    formData.append('public_id', `pacerun/avatars/${State.user.uid}_${ts}`);
-
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
-      method: 'POST',
-      body: formData,
+  function setupProfilePage() {
+    // Avatar
+    document.getElementById('btn-change-avatar').addEventListener('click', () => {
+      document.getElementById('avatar-file-input').click();
     });
 
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error?.message || `HTTP ${res.status}`);
+    document.getElementById('avatar-file-input').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = await readFileAsDataURL(file);
+      await uploadAvatar(url);
+    });
+
+    // Save profile
+    document.getElementById('btn-save-profile').addEventListener('click', saveProfile);
+
+    // Logout
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      const { auth, signOut } = window.__firebase;
+      await signOut(auth);
+      showToast('Até logo! 👋');
+    });
+  }
+
+  async function uploadAvatar(dataURL) {
+    const CLOUD_NAME = 'dzesgiw8e';
+    const UPLOAD_PRESET = 'pacerun_unsigned';
+
+    const { db, doc, updateDoc } = window.__firebase;
+
+    try {
+      showToast('Enviando foto...');
+
+      // Usa timestamp no public_id para garantir nova imagem a cada upload
+      const ts = Date.now();
+      const formData = new FormData();
+      formData.append('file', dataURL);
+      formData.append('upload_preset', UPLOAD_PRESET);
+      formData.append('public_id', `pacerun/avatars/${State.user.uid}_${ts}`);
+
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      // Adiciona bust de cache na URL para o browser não usar a foto antiga
+      const url = `${data.secure_url}?v=${ts}`;
+
+      await updateDoc(doc(db, 'users', State.user.uid), { photoURL: data.secure_url });
+      State.userProfile.photoURL = data.secure_url;
+
+      // Força reload nos elementos de imagem
+      const avatarEls = document.querySelectorAll('#profile-avatar, #header-avatar');
+      avatarEls.forEach(el => {
+        el.src = '';
+        el.src = url;
+      });
+
+      showToast('Foto de perfil atualizada! ✅');
+    } catch (e) {
+      console.error('Upload avatar error:', e);
+      showToast(`Erro ao enviar foto: ${e.message}`);
     }
+  }
 
-    const data = await res.json();
-    // Adiciona bust de cache na URL para o browser não usar a foto antiga
-    const url = `${data.secure_url}?v=${ts}`;
+  // ── Upload de foto de atividade (Cloudinary) ──────────────
+  async function uploadActivityPhoto(dataURL, activityId) {
+    const CLOUD_NAME = 'dzesgiw8e';
+    const UPLOAD_PRESET = 'pacerun_unsigned';
 
-    await updateDoc(doc(db, 'users', State.user.uid), { photoURL: data.secure_url });
-    State.userProfile.photoURL = data.secure_url;
+    try {
+      const formData = new FormData();
+      formData.append('file', dataURL);
+      formData.append('upload_preset', UPLOAD_PRESET);
+      formData.append('public_id', `pacerun/activities/${State.user.uid}/${activityId}`);
 
-    // Força reload nos elementos de imagem
-    const avatarEls = document.querySelectorAll('#profile-avatar, #header-avatar');
-    avatarEls.forEach(el => {
-      el.src = '';
-      el.src = url;
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.secure_url;
+    } catch (e) {
+      console.error('Upload activity photo error:', e);
+      return null;
+    }
+  }
+
+  async function saveProfile() {
+    const { db, doc, updateDoc, auth, updateProfile } = window.__firebase;
+    const name = document.getElementById('profile-name-input').value.trim();
+    const weight = parseInt(document.getElementById('profile-weight').value) || 70;
+    const btn = document.getElementById('btn-save-profile');
+
+    if (!name) { showToast('Digite seu nome.'); return; }
+
+    btn.textContent = 'Salvando...';
+    btn.disabled = true;
+
+    try {
+      await updateDoc(doc(db, 'users', State.user.uid), { name, weight });
+      await updateProfile(auth.currentUser, { displayName: name });
+      State.userProfile = { ...State.userProfile, name, weight };
+      updateHeaderUI();
+      loadProfileData();
+      showToast('Perfil atualizado!');
+    } catch (e) {
+      showToast('Erro ao salvar perfil.');
+    } finally {
+      btn.textContent = 'Salvar alterações';
+      btn.disabled = false;
+    }
+  }
+
+  // ════════════════════════════════════════════════════════
+  // SHARE
+  // ════════════════════════════════════════════════════════
+  function setupShareModal() {
+    document.getElementById('btn-close-share').addEventListener('click', () => {
+      document.getElementById('modal-share').classList.add('hidden');
     });
 
-    showToast('Foto de perfil atualizada! ✅');
-  } catch (e) {
-    console.error('Upload avatar error:', e);
-    showToast(`Erro ao enviar foto: ${e.message}`);
+    document.getElementById('share-instagram').addEventListener('click', () => shareInstagramStories());
+    document.getElementById('share-facebook').addEventListener('click', () => shareFacebook());
+    document.getElementById('share-whatsapp').addEventListener('click', () => shareWhatsApp());
+    document.getElementById('share-other').addEventListener('click', () => shareNative());
   }
-}
 
-// ── Upload de foto de atividade (Cloudinary) ──────────────
-async function uploadActivityPhoto(dataURL, activityId) {
-  const CLOUD_NAME = 'dzesgiw8e';
-  const UPLOAD_PRESET = 'pacerun_unsigned';
+  function openShareModal(activity) {
+    State.currentActivity = activity;
+    const preview = document.getElementById('share-preview');
+    const a = activity;
 
-  try {
-    const formData = new FormData();
-    formData.append('file', dataURL);
-    formData.append('upload_preset', UPLOAD_PRESET);
-    formData.append('public_id', `pacerun/activities/${State.user.uid}/${activityId}`);
-
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.secure_url;
-  } catch (e) {
-    console.error('Upload activity photo error:', e);
-    return null;
-  }
-}
-
-async function saveProfile() {
-  const { db, doc, updateDoc, auth, updateProfile } = window.__firebase;
-  const name = document.getElementById('profile-name-input').value.trim();
-  const weight = parseInt(document.getElementById('profile-weight').value) || 70;
-  const btn = document.getElementById('btn-save-profile');
-
-  if (!name) { showToast('Digite seu nome.'); return; }
-
-  btn.textContent = 'Salvando...';
-  btn.disabled = true;
-
-  try {
-    await updateDoc(doc(db, 'users', State.user.uid), { name, weight });
-    await updateProfile(auth.currentUser, { displayName: name });
-    State.userProfile = { ...State.userProfile, name, weight };
-    updateHeaderUI();
-    loadProfileData();
-    showToast('Perfil atualizado!');
-  } catch (e) {
-    showToast('Erro ao salvar perfil.');
-  } finally {
-    btn.textContent = 'Salvar alterações';
-    btn.disabled = false;
-  }
-}
-
-// ════════════════════════════════════════════════════════
-// SHARE
-// ════════════════════════════════════════════════════════
-function setupShareModal() {
-  document.getElementById('btn-close-share').addEventListener('click', () => {
-    document.getElementById('modal-share').classList.add('hidden');
-  });
-
-  document.getElementById('share-instagram').addEventListener('click', () => shareInstagramStories());
-  document.getElementById('share-facebook').addEventListener('click', () => shareFacebook());
-  document.getElementById('share-whatsapp').addEventListener('click', () => shareWhatsApp());
-  document.getElementById('share-other').addEventListener('click', () => shareNative());
-}
-
-function openShareModal(activity) {
-  State.currentActivity = activity;
-  const preview = document.getElementById('share-preview');
-  const a = activity;
-
-  preview.innerHTML = `
+    preview.innerHTML = `
     <div style="padding:20px;background:var(--blue-900);border-radius:12px">
       <div style="font-family:var(--font-display);font-size:40px;font-weight:800;color:var(--white)">${a.distance?.toFixed(2) || '0.00'} <span style="font-size:20px;color:var(--blue-300)">km</span></div>
       <div style="display:flex;gap:20px;justify-content:center;margin-top:12px">
@@ -1794,173 +1794,173 @@ function openShareModal(activity) {
     </div>
   `;
 
-  document.getElementById('modal-share').classList.remove('hidden');
-}
+    document.getElementById('modal-share').classList.remove('hidden');
+  }
 
-function buildShareText() {
-  const a = State.currentActivity;
-  if (!a) return '';
-  return `🏃 Acabei de completar ${a.distance?.toFixed(2) || '0'} km em ${formatDuration(a.duration || 0)}!\n⚡ Ritmo: ${a.pace || '--'} /km | 🔥 ${Math.round(a.calories || 0)} kcal\n\nvia PaceRun`;
-}
+  function buildShareText() {
+    const a = State.currentActivity;
+    if (!a) return '';
+    return `🏃 Acabei de completar ${a.distance?.toFixed(2) || '0'} km em ${formatDuration(a.duration || 0)}!\n⚡ Ritmo: ${a.pace || '--'} /km | 🔥 ${Math.round(a.calories || 0)} kcal\n\nvia PaceRun`;
+  }
 
-function shareWhatsApp() {
-  const text = encodeURIComponent(buildShareText());
-  window.open(`https://wa.me/?text=${text}`, '_blank');
-}
+  function shareWhatsApp() {
+    const text = encodeURIComponent(buildShareText());
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+  }
 
-function shareInstagramStories() {
-  // Instagram Stories só aceita via app nativo
-  if (navigator.share) {
-    navigator.share({ title: 'Minha corrida no PaceRun', text: buildShareText() })
-      .catch(() => showToast('Compartilhamento cancelado.'));
-  } else {
+  function shareInstagramStories() {
+    // Instagram Stories só aceita via app nativo
+    if (navigator.share) {
+      navigator.share({ title: 'Minha corrida no PaceRun', text: buildShareText() })
+        .catch(() => showToast('Compartilhamento cancelado.'));
+    } else {
+      copyToClipboard(buildShareText());
+      showToast('Texto copiado! Cole no Instagram Stories 📋');
+    }
+  }
+
+  function shareFacebook() {
     copyToClipboard(buildShareText());
-    showToast('Texto copiado! Cole no Instagram Stories 📋');
+    showToast('Texto copiado! Cole no Facebook Stories 📋');
   }
-}
 
-function shareFacebook() {
-  copyToClipboard(buildShareText());
-  showToast('Texto copiado! Cole no Facebook Stories 📋');
-}
-
-function shareNative() {
-  if (navigator.share) {
-    navigator.share({ title: 'Minha atividade no PaceRun', text: buildShareText() })
-      .catch(() => { });
-  } else {
-    copyToClipboard(buildShareText());
-    showToast('Texto copiado para a área de transferência!');
+  function shareNative() {
+    if (navigator.share) {
+      navigator.share({ title: 'Minha atividade no PaceRun', text: buildShareText() })
+        .catch(() => { });
+    } else {
+      copyToClipboard(buildShareText());
+      showToast('Texto copiado para a área de transferência!');
+    }
   }
-}
 
-function copyToClipboard(text) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).catch(() => { });
+  function copyToClipboard(text) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).catch(() => { });
+    }
   }
-}
 
-// ════════════════════════════════════════════════════════
-// UTILS
-// ════════════════════════════════════════════════════════
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+  // ════════════════════════════════════════════════════════
+  // UTILS
+  // ════════════════════════════════════════════════════════
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
 
-function calcCalories(distKm, durationSec) {
-  const weight = State.userProfile?.weight || 70;
-  const MET = State.activity.type === 'running' ? 8.5 : 3.5;
-  const hours = durationSec / 3600;
-  return MET * weight * hours;
-}
+  function calcCalories(distKm, durationSec) {
+    const weight = State.userProfile?.weight || 70;
+    const MET = State.activity.type === 'running' ? 8.5 : 3.5;
+    const hours = durationSec / 3600;
+    return MET * weight * hours;
+  }
 
-function formatDuration(seconds) {
-  const s = Math.round(seconds);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-}
+  function formatDuration(seconds) {
+    const s = Math.round(seconds);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
 
-function formatDateFull(isoStr) {
-  if (!isoStr) return '';
-  try {
-    const d = new Date(isoStr);
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  } catch { return ''; }
-}
+  function formatDateFull(isoStr) {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch { return ''; }
+  }
 
-function formatDateShort(isoStr) {
-  if (!isoStr) return '';
-  try {
-    return new Date(isoStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-  } catch { return ''; }
-}
+  function formatDateShort(isoStr) {
+    if (!isoStr) return '';
+    try {
+      return new Date(isoStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+    } catch { return ''; }
+  }
 
-function showError(el, msg) {
-  el.textContent = msg;
-  el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 5000);
-}
+  function showError(el, msg) {
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 5000);
+  }
 
-function showToast(msg, duration = 3000) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.remove('hidden');
-  clearTimeout(window._toastTimeout);
-  window._toastTimeout = setTimeout(() => t.classList.add('hidden'), duration);
-}
+  function showToast(msg, duration = 3000) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.remove('hidden');
+    clearTimeout(window._toastTimeout);
+    window._toastTimeout = setTimeout(() => t.classList.add('hidden'), duration);
+  }
 
-function readFileAsDataURL(file) {
-  return new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.onload = e => res(e.target.result);
-    reader.onerror = rej;
-    reader.readAsDataURL(file);
-  });
-}
+  function readFileAsDataURL(file) {
+    return new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+  }
 
-// ════════════════════════════════════════════════════════
-// NOTIFICAÇÕES + CONQUISTAS
-// ════════════════════════════════════════════════════════
-const ACHIEVEMENTS = [
-  { id: 'first_run', minRuns: 1, emoji: '🏃', title: 'Primeira atividade!', desc: 'Você completou sua primeira atividade no PaceRun. Bem-vindo!' },
-  { id: 'km_5', minKm: 5, emoji: '⭐', title: '5 km acumulados!', desc: 'Você já percorreu 5 km no total. Continue assim!' },
-  { id: 'km_10', minKm: 10, emoji: '🔟', title: '10 km acumulados!', desc: 'Marca dos 10 km atingida. Você está no caminho certo!' },
-  { id: 'km_25', minKm: 25, emoji: '🥈', title: '25 km acumulados!', desc: 'Um quarto de maratona percorrido! Incrível evolução.' },
-  { id: 'km_50', minKm: 50, emoji: '🥇', title: '50 km acumulados!', desc: 'Meio centenário! Você é um atleta de verdade.' },
-  { id: 'km_100', minKm: 100, emoji: '💯', title: '100 km acumulados!', desc: 'Centenário! Uma conquista e tanto. Parabéns!' },
-  { id: 'runs_10', minRuns: 10, emoji: '🔥', title: '10 atividades!', desc: '10 atividades completadas. A consistência é tudo!' },
-  { id: 'runs_50', minRuns: 50, emoji: '🏆', title: '50 atividades!', desc: 'Você é um corredor dedicado. 50 atividades!' },
-];
+  // ════════════════════════════════════════════════════════
+  // NOTIFICAÇÕES + CONQUISTAS
+  // ════════════════════════════════════════════════════════
+  const ACHIEVEMENTS = [
+    { id: 'first_run', minRuns: 1, emoji: '🏃', title: 'Primeira atividade!', desc: 'Você completou sua primeira atividade no PaceRun. Bem-vindo!' },
+    { id: 'km_5', minKm: 5, emoji: '⭐', title: '5 km acumulados!', desc: 'Você já percorreu 5 km no total. Continue assim!' },
+    { id: 'km_10', minKm: 10, emoji: '🔟', title: '10 km acumulados!', desc: 'Marca dos 10 km atingida. Você está no caminho certo!' },
+    { id: 'km_25', minKm: 25, emoji: '🥈', title: '25 km acumulados!', desc: 'Um quarto de maratona percorrido! Incrível evolução.' },
+    { id: 'km_50', minKm: 50, emoji: '🥇', title: '50 km acumulados!', desc: 'Meio centenário! Você é um atleta de verdade.' },
+    { id: 'km_100', minKm: 100, emoji: '💯', title: '100 km acumulados!', desc: 'Centenário! Uma conquista e tanto. Parabéns!' },
+    { id: 'runs_10', minRuns: 10, emoji: '🔥', title: '10 atividades!', desc: '10 atividades completadas. A consistência é tudo!' },
+    { id: 'runs_50', minRuns: 50, emoji: '🏆', title: '50 atividades!', desc: 'Você é um corredor dedicado. 50 atividades!' },
+  ];
 
-function getNotifs() {
-  try { return JSON.parse(localStorage.getItem('pacerun_notifs') || '[]'); } catch { return []; }
-}
-function saveNotifs(n) { localStorage.setItem('pacerun_notifs', JSON.stringify(n)); }
+  function getNotifs() {
+    try { return JSON.parse(localStorage.getItem('pacerun_notifs') || '[]'); } catch { return []; }
+  }
+  function saveNotifs(n) { localStorage.setItem('pacerun_notifs', JSON.stringify(n)); }
 
-function addNotif(notif) {
-  const notifs = getNotifs();
-  if (notif.id && notifs.find(n => n.id === notif.id)) return; // sem duplicata
-  notifs.unshift({ ...notif, ts: Date.now(), read: false });
-  if (notifs.length > 50) notifs.splice(50);
-  saveNotifs(notifs);
-  updateNotifBadge();
-  showToast(`${notif.emoji} ${notif.title}`);
-}
-
-function updateNotifBadge() {
-  const unread = getNotifs().filter(n => !n.read).length;
-  const badge = document.getElementById('notif-badge');
-  if (!badge) return;
-  if (unread > 0) { badge.textContent = unread > 9 ? '9+' : unread; badge.classList.remove('hidden'); }
-  else { badge.classList.add('hidden'); }
-}
-
-function setupNotifications() {
-  document.getElementById('btn-notifications')?.addEventListener('click', openNotifModal);
-  document.getElementById('btn-close-notifications')?.addEventListener('click', () => {
-    document.getElementById('modal-notifications').classList.add('hidden');
-  });
-  document.getElementById('btn-mark-all-read')?.addEventListener('click', () => {
-    saveNotifs(getNotifs().map(n => ({ ...n, read: true })));
+  function addNotif(notif) {
+    const notifs = getNotifs();
+    if (notif.id && notifs.find(n => n.id === notif.id)) return; // sem duplicata
+    notifs.unshift({ ...notif, ts: Date.now(), read: false });
+    if (notifs.length > 50) notifs.splice(50);
+    saveNotifs(notifs);
     updateNotifBadge();
-    openNotifModal();
-  });
-  updateNotifBadge();
-}
+    showToast(`${notif.emoji} ${notif.title}`);
+  }
 
-function openNotifModal() {
-  const notifs = getNotifs();
-  const el = document.getElementById('notifications-list');
-  el.innerHTML = notifs.length === 0
-    ? `<div class="notif-empty"><div style="font-size:40px;margin-bottom:12px">🔔</div><p>Nenhuma notificação ainda.<br>Complete atividades para ganhar conquistas!</p></div>`
-    : notifs.map(n => `
+  function updateNotifBadge() {
+    const unread = getNotifs().filter(n => !n.read).length;
+    const badge = document.getElementById('notif-badge');
+    if (!badge) return;
+    if (unread > 0) { badge.textContent = unread > 9 ? '9+' : unread; badge.classList.remove('hidden'); }
+    else { badge.classList.add('hidden'); }
+  }
+
+  function setupNotifications() {
+    document.getElementById('btn-notifications')?.addEventListener('click', openNotifModal);
+    document.getElementById('btn-close-notifications')?.addEventListener('click', () => {
+      document.getElementById('modal-notifications').classList.add('hidden');
+    });
+    document.getElementById('btn-mark-all-read')?.addEventListener('click', () => {
+      saveNotifs(getNotifs().map(n => ({ ...n, read: true })));
+      updateNotifBadge();
+      openNotifModal();
+    });
+    updateNotifBadge();
+  }
+
+  function openNotifModal() {
+    const notifs = getNotifs();
+    const el = document.getElementById('notifications-list');
+    el.innerHTML = notifs.length === 0
+      ? `<div class="notif-empty"><div style="font-size:40px;margin-bottom:12px">🔔</div><p>Nenhuma notificação ainda.<br>Complete atividades para ganhar conquistas!</p></div>`
+      : notifs.map(n => `
         <div class="notif-item ${n.read ? '' : 'unread'}">
           <div class="notif-icon ${n.type || 'achievement'}">${n.emoji}</div>
           <div class="notif-body">
@@ -1969,370 +1969,360 @@ function openNotifModal() {
             <div class="notif-time">${formatTimeAgo(n.ts)}</div>
           </div>
         </div>`).join('');
-  document.getElementById('modal-notifications').classList.remove('hidden');
-}
+    document.getElementById('modal-notifications').classList.remove('hidden');
+  }
 
-function checkAchievements(totalKm, totalRuns) {
-  ACHIEVEMENTS.forEach(a => {
-    const kmOk = !a.minKm || totalKm >= a.minKm;
-    const runsOk = !a.minRuns || totalRuns >= a.minRuns;
-    if (kmOk && runsOk) addNotif({ id: a.id, emoji: a.emoji, title: a.title, desc: a.desc, type: 'achievement' });
-  });
-}
-
-async function checkCommunityNotifications() {
-  if (!State.user) return;
-  const { db, collection, query, orderBy, limit, getDocs, where } = window.__firebase;
-  try {
-    const q = query(
-      collection(db, 'activities'),
-      where('userId', '!=', State.user.uid),
-      orderBy('userId'), orderBy('timestamp', 'desc'),
-      limit(5)
-    );
-    const snap = await getDocs(q);
-    snap.forEach(d => {
-      const a = d.data();
-      addNotif({
-        id: `comm_${d.id}`,
-        emoji: a.type === 'walking' ? '🚶' : '🏃',
-        title: `${a.userName} completou uma atividade!`,
-        desc: `${(a.distance || 0).toFixed(2)} km em ${formatDuration(a.duration || 0)} · Ritmo ${a.pace || '--'}`,
-        type: 'community',
-      });
+  function checkAchievements(totalKm, totalRuns) {
+    ACHIEVEMENTS.forEach(a => {
+      const kmOk = !a.minKm || totalKm >= a.minKm;
+      const runsOk = !a.minRuns || totalRuns >= a.minRuns;
+      if (kmOk && runsOk) addNotif({ id: a.id, emoji: a.emoji, title: a.title, desc: a.desc, type: 'achievement' });
     });
-  } catch { /* índice não criado ainda */ }
-}
+  }
 
-function formatTimeAgo(ts) {
-  if (!ts) return '';
-  const diff = Date.now() - ts;
-  const m = Math.floor(diff / 60000);
-  const h = Math.floor(diff / 3600000);
-  const d = Math.floor(diff / 86400000);
-  if (m < 1) return 'agora mesmo';
-  if (m < 60) return `há ${m} min`;
-  if (h < 24) return `há ${h}h`;
-  return `há ${d} dia${d > 1 ? 's' : ''}`;
-}
+  async function checkCommunityNotifications() {
+    if (!State.user) return;
+    const { db, collection, query, orderBy, limit, getDocs, where } = window.__firebase;
+    try {
+      const q = query(
+        collection(db, 'activities'),
+        where('userId', '!=', State.user.uid),
+        orderBy('userId'), orderBy('timestamp', 'desc'),
+        limit(5)
+      );
+      const snap = await getDocs(q);
+      snap.forEach(d => {
+        const a = d.data();
+        addNotif({
+          id: `comm_${d.id}`,
+          emoji: a.type === 'walking' ? '🚶' : '🏃',
+          title: `${a.userName} completou uma atividade!`,
+          desc: `${(a.distance || 0).toFixed(2)} km em ${formatDuration(a.duration || 0)} · Ritmo ${a.pace || '--'}`,
+          type: 'community',
+        });
+      });
+    } catch { /* índice não criado ainda */ }
+  }
 
-// ════════════════════════════════════════════════════════
-// PRÓXIMAS CORRIDAS
-// ════════════════════════════════════════════════════════
+  function formatTimeAgo(ts) {
+    if (!ts) return '';
+    const diff = Date.now() - ts;
+    const m = Math.floor(diff / 60000);
+    const h = Math.floor(diff / 3600000);
+    const d = Math.floor(diff / 86400000);
+    if (m < 1) return 'agora mesmo';
+    if (m < 60) return `há ${m} min`;
+    if (h < 24) return `há ${h}h`;
+    return `há ${d} dia${d > 1 ? 's' : ''}`;
+  }
 
-function setupRaces() {
-  document.getElementById('btn-open-races')?.addEventListener('click', () => {
-    document.getElementById('modal-races').classList.remove('hidden');
-    document.getElementById('races-empty').classList.remove('hidden');
-    document.getElementById('races-list').innerHTML = '';
-  });
+  // ════════════════════════════════════════════════════════
+  // PRÓXIMAS CORRIDAS
+  // ════════════════════════════════════════════════════════
 
-  document.getElementById('btn-close-races')?.addEventListener('click', () => {
-    document.getElementById('modal-races').classList.add('hidden');
-  });
+  function setupRaces() {
+    document.getElementById('btn-open-races')?.addEventListener('click', () => {
+      document.getElementById('modal-races').classList.remove('hidden');
+      document.getElementById('races-empty').classList.remove('hidden');
+      document.getElementById('races-list').innerHTML = '';
+    });
 
-  document.getElementById('btn-search-races')?.addEventListener('click', () => {
-    const city = document.getElementById('races-city-input').value.trim();
-    if (city) searchRaces(city);
-  });
+    document.getElementById('btn-close-races')?.addEventListener('click', () => {
+      document.getElementById('modal-races').classList.add('hidden');
+    });
 
-  document.getElementById('races-city-input')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      const city = e.target.value.trim();
+    document.getElementById('btn-search-races')?.addEventListener('click', () => {
+      const city = document.getElementById('races-city-input').value.trim();
       if (city) searchRaces(city);
-    }
-  });
-
-  // Chips de cidades rápidas
-  document.querySelectorAll('.city-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.city-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      document.getElementById('races-city-input').value = chip.dataset.city;
-      searchRaces(chip.dataset.city);
     });
-  });
-}
 
-// ── Dados reais extraídos do Esportividade (São Paulo e Guarulhos) ─────────
-// ── Database de eventos reais ──────────────────────────
-// Fontes: Esportividade, Prefeitura SP (SEME), Brasil Que Corre, Olympics.com
-// Atualizado: Junho 2026
-const RACES_DATABASE = {
-  'são paulo': [
-    { name: 'Treino gratuito Vem Com Nóis – Av. Paulista', date: '10/06/2026', day: '10', month: 'JUN', distances: ['5km'], type: 'Treino Gratuito', location: 'Av. Paulista — São Paulo', description: 'Treino noturno gratuito na Av. Paulista, ponto de encontro Provisório Bar.', link: 'https://esportividade.com.br/evento/treino-gratuito-de-corrida-do-vem-com-nois-na-av-paulista-10-06-2026/', confirmed: true },
-    { name: 'adidas Runners – Treino gratuito no Ceret', date: '11/06/2026', day: '11', month: 'JUN', distances: ['5km', '10km'], type: 'Treino Gratuito', location: 'CERET — Zona Leste, São Paulo', description: 'Treino gratuito do grupo adidas Runners no CERET.', link: 'https://esportividade.com.br/evento/adidas-runners-treino-gratuito-no-ceret-11-06-2026/', confirmed: true },
-    { name: 'Urban Walk 2026 – Parque Villa-Lobos', date: '13/06/2026', day: '13', month: 'JUN', distances: ['5km', '10km'], type: 'Caminhada', location: 'Parque Villa-Lobos — São Paulo', description: 'Evento de caminhada e corrida urbana no Parque Villa-Lobos.', link: 'https://esportividade.com.br/evento/urban-walk-2026-parque-villa-lobos-sao-paulo/', confirmed: true },
-    { name: 'Corrida Copa do Mundo no Ceret 2026', date: '13/06/2026', day: '13', month: 'JUN', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'CERET — Zona Leste, São Paulo', description: 'Corrida temática Copa do Mundo no CERET.', link: 'https://esportividade.com.br/evento/corrida-copa-do-mundo-no-ceret-2026-sao-paulo/', confirmed: true },
-    { name: 'VEJA Shift Run – Treino gratuito', date: '13/06/2026', day: '13', month: 'JUN', distances: ['5km'], type: 'Treino Gratuito', location: 'VEJA Oscar Freire — São Paulo', description: 'Treino gratuito de corrida com a VEJA na Oscar Freire.', link: 'https://esportividade.com.br/evento/veja-shift-run-treino-gratuito-de-corrida-13-06-2026/', confirmed: true },
-    { name: 'Live! Run XP – Etapa Indaiatuba (Junho)', date: '21/06/2026', day: '21', month: 'JUN', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Indaiatuba — SP', description: 'Etapa de junho do circuito Live! Run XP em Indaiatuba.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
-    { name: 'Live! Run XP – Etapa Jundiaí (Junho)', date: '28/06/2026', day: '28', month: 'JUN', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Jundiaí — SP', description: 'Etapa de junho do circuito Live! Run XP em Jundiaí.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
-    { name: 'Live! Run XP – Etapa São Paulo (Julho)', date: '12/07/2026', day: '12', month: 'JUL', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'São Paulo — SP', description: 'Etapa de julho do circuito Live! Run XP em São Paulo.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
-    { name: 'Live! Run XP – Etapa Ribeirão Preto (Julho)', date: '19/07/2026', day: '19', month: 'JUL', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Ribeirão Preto — SP', description: 'Etapa de julho do circuito Live! Run XP em Ribeirão Preto.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
-    { name: 'Live! Run XP – Etapa Sorocaba (Julho)', date: '26/07/2026', day: '26', month: 'JUL', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Sorocaba — SP', description: 'Etapa de julho do circuito Live! Run XP em Sorocaba.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
-    { name: 'Live! Run XP – Etapa São Paulo (Agosto)', date: '16/08/2026', day: '16', month: 'AGO', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'São Paulo — SP', description: 'Etapa de agosto do circuito Live! Run XP em São Paulo.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
-    { name: 'Netshoes Run', date: '23/08/2026', day: '23', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Parque do Povo — Marginal Pinheiros, São Paulo', description: 'Corrida oficial Netshoes no Parque do Povo.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
-    { name: 'Todateen Night Run 2026', date: '29/08/2026', day: '29', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida Noturna', location: 'Sambódromo do Anhembi — São Paulo', description: 'Corrida noturna Todateen no icônico Sambódromo do Anhembi.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
-    { name: 'Run The Bridge', date: '30/08/2026', day: '30', month: 'AGO', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Ponte Estaiada — Marginal Pinheiros, São Paulo', description: 'Corrida com largada na icônica Ponte Estaiada da Marginal Pinheiros.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
-    { name: 'Palmeiras Run', date: '30/08/2026', day: '30', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Allianz Parque — São Paulo', description: 'Corrida oficial do Palmeiras com chegada no Allianz Parque.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
-    { name: '19ª Corrida Juventus Viva a Mooca', date: '30/08/2026', day: '30', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Clube Juventus — Mooca, São Paulo', description: 'Tradicional corrida do Clube Atlético Juventus no bairro da Mooca.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
-    { name: 'Santander Track&Fields – Obelisco Ibirapuera', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Obelisco do Ibirapuera — São Paulo', description: 'Etapa da série Santander T&F no Obelisco do Ibirapuera.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
-    { name: 'Santander Track&Fields – Esporte Clube Pinheiros', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Esporte Clube Pinheiros — São Paulo', description: 'Etapa da série Santander T&F no Esporte Clube Pinheiros.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
-    { name: 'Live! Run XP – Etapa São Paulo (Setembro)', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'São Paulo — SP', description: 'Etapa de setembro do circuito Live! Run XP em São Paulo.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
-    { name: 'Maratona Internacional de SP (FILA) – USP', date: '20/09/2026', day: '20', month: 'SET', distances: ['5km', '10km', '21km', '42km'], type: 'Maratona', location: 'Campus USP — São Paulo', description: 'Maratona Internacional de São Paulo da FILA, uma das maiores corridas do Brasil.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
-    { name: 'Santander Track&Fields – JK Iguatemi III', date: '11/10/2026', day: '11', month: 'OUT', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Shopping JK Iguatemi — São Paulo', description: 'Terceira etapa do T&F Series no JK Iguatemi, com opção de 21km.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
-    { name: 'Athenas Run Longer', date: '18/10/2026', day: '18', month: 'OUT', distances: ['7km', '14km', '21km', '28km'], type: 'Corrida de Rua', location: 'Parque do Povo — Marginal Pinheiros, São Paulo', description: 'Corrida especial Athenas com distâncias longas: 7, 14, 21 e 28km.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
-    { name: 'Santander Track&Fields – Center Norte III', date: '18/10/2026', day: '18', month: 'OUT', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Shopping Center Norte — São Paulo', description: 'Etapa da série Santander T&F no Shopping Center Norte.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
-    { name: 'Santander Track&Fields – Pátio Higienópolis', date: '19/10/2026', day: '19', month: 'OUT', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Praça Charles Miller — São Paulo', description: 'Etapa da série Santander T&F com largada na Praça Charles Miller.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
-    { name: 'Nike SP City Marathon 2026', date: '01/11/2026', day: '01', month: 'NOV', distances: ['10km', '21km', '42km'], type: 'Maratona', location: 'São Paulo — SP', description: 'A Nike SP City Marathon 2026 com percurso reformulado. Uma das corridas mais aguardadas do ano.', link: 'https://esportividade.com.br/nike-sp-city-marathon-percurso-muda-para-2026-e-nike-realiza-treinos-gratis/', confirmed: false },
-    { name: 'Circuito das Estações – Verão', date: '15/11/2026', day: '15', month: 'NOV', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Praça Charles Miller — São Paulo', description: 'Etapa de Verão do tradicional Circuito das Estações na Praça Charles Miller.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
-    { name: 'Corrida Internacional de São Silvestre', date: '31/12/2026', day: '31', month: 'DEZ', distances: ['15km'], type: 'Corrida Internacional', location: 'Av. Paulista — São Paulo', description: 'A mais tradicional corrida de rua do Brasil na Av. Paulista, disputada no último dia do ano desde 1924.', link: 'https://www.saosilvestre.com.br/', confirmed: true },
-  ],
-  'guarulhos': [
-    { name: 'Corrida Rotary Guarulhos', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Guarulhos — SP', description: 'Corrida organizada pelo Rotary Club de Guarulhos.', link: 'https://brasilquecorre.com/saopaulo', confirmed: true },
-    { name: 'Calendário completo de Guarulhos — Esportividade', date: '', day: '📅', month: 'SP', distances: ['5km', '10km', '21km'], type: 'Calendário', location: 'Guarulhos — SP', description: 'Acesse o calendário completo de corridas na região metropolitana de SP, incluindo Guarulhos.', link: 'https://esportividade.com.br/corrida-de-rua/', confirmed: true },
-    { name: 'Buscar corridas em Guarulhos 2026', date: '', day: '🔍', month: 'Google', distances: [], type: 'Pesquisa', location: 'Guarulhos — SP', description: 'Toque para buscar eventos de corrida em Guarulhos no Google.', link: 'https://www.google.com/search?q=corridas+de+rua+guarulhos+2026', confirmed: false },
-  ],
-};
+    document.getElementById('races-city-input')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const city = e.target.value.trim();
+        if (city) searchRaces(city);
+      }
+    });
 
-// ── Paginação de eventos ───────────────────────────────
-const EVENTS_PAGE_SIZE = 5;
-let _eventsPage = 0;
-let _eventsAll = [];
-
-async function searchRaces(city) {
-  const loadingEl = document.getElementById('races-loading');
-  const emptyEl = document.getElementById('races-empty');
-  const listEl = document.getElementById('races-list');
-
-  emptyEl.classList.add('hidden');
-  listEl.innerHTML = '';
-  loadingEl.classList.remove('hidden');
-  document.getElementById('races-loading-city').textContent = city;
-
-  await new Promise(r => setTimeout(r, 400));
-
-  const cityKey = city.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-
-  let races = null;
-  for (const key of Object.keys(RACES_DATABASE)) {
-    const nk = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (cityKey.includes(nk) || nk.includes(cityKey)) { races = RACES_DATABASE[key]; break; }
-  }
-
-  if (races) {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    _eventsAll = races
-      .filter(r => {
-        if (!r.date || r.date.length < 8) return true;
-        const [d, m, y] = r.date.split('/');
-        return new Date(`${y}-${m}-${d}`) >= today;
-      })
-      .sort((a, b) => {
-        if (!a.date || a.date.length < 8) return 1;
-        if (!b.date || b.date.length < 8) return -1;
-        const [da, ma, ya] = a.date.split('/');
-        const [db2, mb, yb] = b.date.split('/');
-        return new Date(`${ya}-${ma}-${da}`) - new Date(`${yb}-${mb}-${db2}`);
+    // Chips de cidades rápidas
+    document.querySelectorAll('.city-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.city-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        document.getElementById('races-city-input').value = chip.dataset.city;
+        searchRaces(chip.dataset.city);
       });
-  } else {
-    _eventsAll = [
-      { name: `Calendário Esportividade`, date: '', day: '📅', month: '2026', distances: ['Várias'], type: 'Calendário', location: city, description: `Para ${city}, acesse o calendário completo no Esportividade.`, link: 'https://esportividade.com.br/corrida-de-rua/', confirmed: true },
-      { name: `Buscar corridas em ${city} 2026`, date: '', day: '🔍', month: 'Google', distances: [], type: 'Pesquisa', location: city, description: `Buscar eventos em ${city} no Google.`, link: `https://www.google.com/search?q=corridas+de+rua+${encodeURIComponent(city)}+2026`, confirmed: false },
-    ];
+    });
   }
 
-  _eventsPage = 0;
-  renderEventsPage(listEl);
-  loadingEl.classList.add('hidden');
-}
+  // ── Dados reais extraídos do Esportividade (São Paulo e Guarulhos) ─────────
+  // Fonte: https://esportividade.com.br/corrida-de-rua/
+  // Atualizado em: Junho 2026
+  // ── Database de eventos reais (Esportividade, Prefeitura SP, Brasil Que Corre) ──
+  const RACES_DATABASE = {
+    'são paulo': [
+      { name: 'Treino gratuito Vem Com Nóis – Av. Paulista', date: '10/06/2026', day: '10', month: 'JUN', distances: ['5km'], type: 'Treino Gratuito', location: 'Av. Paulista — São Paulo', description: 'Treino noturno gratuito na Av. Paulista, ponto de encontro Provisório Bar.', link: 'https://esportividade.com.br/evento/treino-gratuito-de-corrida-do-vem-com-nois-na-av-paulista-10-06-2026/', confirmed: true },
+      { name: 'adidas Runners – Treino gratuito no Ceret', date: '11/06/2026', day: '11', month: 'JUN', distances: ['5km', '10km'], type: 'Treino Gratuito', location: 'CERET — Zona Leste, São Paulo', description: 'Treino gratuito do grupo adidas Runners no CERET.', link: 'https://esportividade.com.br/evento/adidas-runners-treino-gratuito-no-ceret-11-06-2026/', confirmed: true },
+      { name: 'Urban Walk 2026 – Parque Villa-Lobos', date: '13/06/2026', day: '13', month: 'JUN', distances: ['5km', '10km'], type: 'Caminhada', location: 'Parque Villa-Lobos — São Paulo', description: 'Evento de caminhada e corrida urbana no Parque Villa-Lobos.', link: 'https://esportividade.com.br/evento/urban-walk-2026-parque-villa-lobos-sao-paulo/', confirmed: true },
+      { name: 'Corrida Copa do Mundo no Ceret 2026', date: '13/06/2026', day: '13', month: 'JUN', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'CERET — Zona Leste, São Paulo', description: 'Corrida temática Copa do Mundo no CERET.', link: 'https://esportividade.com.br/evento/corrida-copa-do-mundo-no-ceret-2026-sao-paulo/', confirmed: true },
+      { name: 'VEJA Shift Run – Treino gratuito', date: '13/06/2026', day: '13', month: 'JUN', distances: ['5km'], type: 'Treino Gratuito', location: 'VEJA Oscar Freire — São Paulo', description: 'Treino gratuito de corrida com a VEJA na Oscar Freire.', link: 'https://esportividade.com.br/evento/veja-shift-run-treino-gratuito-de-corrida-13-06-2026/', confirmed: true },
+      { name: 'Live! Run XP – Etapa Indaiatuba (Junho)', date: '21/06/2026', day: '21', month: 'JUN', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Indaiatuba — SP', description: 'Etapa de junho do circuito Live! Run XP em Indaiatuba.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+      { name: 'Live! Run XP – Etapa Jundiaí (Junho)', date: '28/06/2026', day: '28', month: 'JUN', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Jundiaí — SP', description: 'Etapa de junho do circuito Live! Run XP em Jundiaí.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+      { name: 'Live! Run XP – Etapa São Paulo (Julho)', date: '12/07/2026', day: '12', month: 'JUL', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'São Paulo — SP', description: 'Etapa de julho do circuito Live! Run XP em São Paulo.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+      { name: 'Live! Run XP – Etapa Ribeirão Preto (Julho)', date: '19/07/2026', day: '19', month: 'JUL', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Ribeirão Preto — SP', description: 'Etapa de julho do circuito Live! Run XP em Ribeirão Preto.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+      { name: 'Live! Run XP – Etapa Sorocaba (Julho)', date: '26/07/2026', day: '26', month: 'JUL', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Sorocaba — SP', description: 'Etapa de julho do circuito Live! Run XP em Sorocaba.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+      { name: 'Live! Run XP – Etapa São Paulo (Agosto)', date: '16/08/2026', day: '16', month: 'AGO', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'São Paulo — SP', description: 'Etapa de agosto do circuito Live! Run XP em São Paulo.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+      { name: 'Netshoes Run', date: '23/08/2026', day: '23', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Parque do Povo — Marginal Pinheiros, São Paulo', description: 'Corrida oficial Netshoes no Parque do Povo.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+      { name: 'Todateen Night Run 2026', date: '29/08/2026', day: '29', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida Noturna', location: 'Sambódromo do Anhembi — São Paulo', description: 'Corrida noturna Todateen no Sambódromo do Anhembi.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+      { name: 'Run The Bridge', date: '30/08/2026', day: '30', month: 'AGO', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Ponte Estaiada — Marginal Pinheiros, São Paulo', description: 'Corrida com largada na icônica Ponte Estaiada.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+      { name: 'Palmeiras Run', date: '30/08/2026', day: '30', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Allianz Parque — São Paulo', description: 'Corrida oficial do Palmeiras com chegada no Allianz Parque.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+      { name: '19ª Corrida Juventus Viva a Mooca', date: '30/08/2026', day: '30', month: 'AGO', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Clube Juventus — Mooca, São Paulo', description: 'Tradicional corrida do Clube Atlético Juventus na Mooca.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+      { name: 'Santander Track&Fields – Obelisco Ibirapuera', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Obelisco do Ibirapuera — São Paulo', description: 'Etapa da série Santander T&F no Obelisco do Ibirapuera.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+      { name: 'Santander Track&Fields – Esporte Clube Pinheiros', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Esporte Clube Pinheiros — São Paulo', description: 'Etapa da série Santander T&F no Esporte Clube Pinheiros.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+      { name: 'Live! Run XP – Etapa São Paulo (Setembro)', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'São Paulo — SP', description: 'Etapa de setembro do circuito Live! Run XP em São Paulo.', link: 'https://esportividade.com.br/corrida-de-rua/live-run-xp/', confirmed: true },
+      { name: 'Maratona Internacional de SP (FILA) – USP', date: '20/09/2026', day: '20', month: 'SET', distances: ['5km', '10km', '21km', '42km'], type: 'Maratona', location: 'Campus USP — São Paulo', description: 'Maratona Internacional de São Paulo da FILA, uma das maiores corridas do Brasil.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+      { name: 'Santander Track&Fields – JK Iguatemi III', date: '11/10/2026', day: '11', month: 'OUT', distances: ['5km', '10km', '21km'], type: 'Corrida de Rua', location: 'Shopping JK Iguatemi — São Paulo', description: 'Etapa do T&F Series no JK Iguatemi com opção de 21km.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+      { name: 'Athenas Run Longer', date: '18/10/2026', day: '18', month: 'OUT', distances: ['7km', '14km', '21km', '28km'], type: 'Corrida de Rua', location: 'Parque do Povo — Marginal Pinheiros, São Paulo', description: 'Corrida especial Athenas com distâncias longas: 7, 14, 21 e 28km.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+      { name: 'Santander Track&Fields – Center Norte III', date: '18/10/2026', day: '18', month: 'OUT', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Shopping Center Norte — São Paulo', description: 'Etapa da série Santander T&F no Shopping Center Norte.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+      { name: 'Santander Track&Fields – Pátio Higienópolis', date: '19/10/2026', day: '19', month: 'OUT', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Praça Charles Miller — São Paulo', description: 'Etapa da série Santander T&F com largada na Praça Charles Miller.', link: 'https://www.olympics.com/pt/noticias/corrida-de-rua-sao-paulo-2026-calendario-provas', confirmed: true },
+      { name: 'Nike SP City Marathon 2026', date: '01/11/2026', day: '01', month: 'NOV', distances: ['10km', '21km', '42km'], type: 'Maratona', location: 'São Paulo — SP', description: 'Nike SP City Marathon 2026 com percurso reformulado. Uma das corridas mais aguardadas do ano.', link: 'https://esportividade.com.br/nike-sp-city-marathon-percurso-muda-para-2026-e-nike-realiza-treinos-gratis/', confirmed: false },
+      { name: 'Circuito das Estações – Verão', date: '15/11/2026', day: '15', month: 'NOV', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Praça Charles Miller — São Paulo', description: 'Etapa de Verão do tradicional Circuito das Estações.', link: 'https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722', confirmed: true },
+      { name: 'Corrida Internacional de São Silvestre', date: '31/12/2026', day: '31', month: 'DEZ', distances: ['15km'], type: 'Corrida Internacional', location: 'Av. Paulista — São Paulo', description: 'A mais tradicional corrida de rua do Brasil na Av. Paulista, desde 1924.', link: 'https://www.saosilvestre.com.br/', confirmed: true },
+    ],
+    'guarulhos': [
+      { name: 'Corrida Rotary Guarulhos', date: '13/09/2026', day: '13', month: 'SET', distances: ['5km', '10km'], type: 'Corrida de Rua', location: 'Guarulhos — SP', description: 'Corrida organizada pelo Rotary Club de Guarulhos.', link: 'https://brasilquecorre.com/saopaulo', confirmed: true },
+      { name: 'Calendário completo — Esportividade', date: '', day: '📅', month: 'SP', distances: ['5km', '10km', '21km'], type: 'Calendário', location: 'Guarulhos — SP', description: 'Acesse o calendário completo de corridas na região metropolitana de SP, incluindo Guarulhos.', link: 'https://esportividade.com.br/corrida-de-rua/', confirmed: true },
+      { name: 'Buscar corridas em Guarulhos 2026', date: '', day: '🔍', month: 'Google', distances: [], type: 'Pesquisa', location: 'Guarulhos — SP', description: 'Toque para buscar eventos de corrida em Guarulhos no Google.', link: 'https://www.google.com/search?q=corridas+de+rua+guarulhos+2026', confirmed: false },
+    ],
+  };
 
-function renderEventsPage(listEl) {
-  const start = _eventsPage * EVENTS_PAGE_SIZE;
-  const page = _eventsAll.slice(start, start + EVENTS_PAGE_SIZE);
-  const hasMore = start + EVENTS_PAGE_SIZE < _eventsAll.length;
-  const remaining = _eventsAll.length - (start + EVENTS_PAGE_SIZE);
+  // ── Paginação de eventos ───────────────────────────────
+  const EVENTS_PAGE_SIZE = 5;
+  let _eventsPage = 0;
+  let _eventsAll  = [];
 
-  // Remove botão e disclaimer anteriores
-  listEl.querySelector('.btn-more-events')?.remove();
-  listEl.querySelector('.races-disclaimer')?.remove();
+  async function searchRaces(city) {
+    const loadingEl = document.getElementById('races-loading');
+    const emptyEl = document.getElementById('races-empty');
+    const listEl = document.getElementById('races-list');
 
-  const html = page.map(r => {
-    const distTags = (r.distances || []).map(d => `<span class="race-tag dist">${d}</span>`).join('');
-    const linkEl = r.link
-      ? `<a href="${r.link}" target="_blank" rel="noopener noreferrer" class="race-link"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> Ver inscrições</a>`
-      : `<p class="race-no-link">🔍 Pesquise o nome do evento</p>`;
-    const unconfirmed = !r.confirmed ? `<span class="race-tag type" style="background:rgba(255,77,77,0.1);color:#FF8080">Não confirmado</span>` : '';
-    return `<div class="race-card">
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = '';
+    loadingEl.classList.remove('hidden');
+    document.getElementById('races-loading-city').textContent = city;
+
+    // Simula loading para melhor UX
+    await new Promise(r => setTimeout(r, 600));
+
+    const cityKey = city.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+    let races = null;
+    for (const key of Object.keys(RACES_DATABASE)) {
+      const nk = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (cityKey.includes(nk) || nk.includes(cityKey)) { races = RACES_DATABASE[key]; break; }
+    }
+
+    if (races) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      _eventsAll = races
+        .filter(r => {
+          if (!r.date || r.date.length < 8) return true;
+          const [d, m, y] = r.date.split('/');
+          return new Date(`${y}-${m}-${d}`) >= today;
+        })
+        .sort((a, b) => {
+          if (!a.date || a.date.length < 8) return 1;
+          if (!b.date || b.date.length < 8) return -1;
+          const [da, ma, ya] = a.date.split('/');
+          const [db2, mb, yb] = b.date.split('/');
+          return new Date(`${ya}-${ma}-${da}`) - new Date(`${yb}-${mb}-${db2}`);
+        });
+    } else {
+      _eventsAll = [
+        { name: `Calendário Esportividade`, date: '', day: '📅', month: '2026', distances: ['Várias'], type: 'Calendário', location: city, description: `Para ${city}, acesse o calendário completo no Esportividade.`, link: 'https://esportividade.com.br/corrida-de-rua/', confirmed: true },
+        { name: `Buscar corridas em ${city} 2026`, date: '', day: '🔍', month: 'Google', distances: [], type: 'Pesquisa', location: city, description: `Buscar eventos em ${city} no Google.`, link: `https://www.google.com/search?q=corridas+de+rua+${encodeURIComponent(city)}+2026`, confirmed: false },
+      ];
+    }
+
+    _eventsPage = 0;
+    renderEventsPage(listEl);
+    loadingEl.classList.add('hidden');
+  }
+
+  function renderEventsPage(listEl) {
+    const start   = _eventsPage * EVENTS_PAGE_SIZE;
+    const page    = _eventsAll.slice(start, start + EVENTS_PAGE_SIZE);
+    const hasMore = start + EVENTS_PAGE_SIZE < _eventsAll.length;
+    const remaining = _eventsAll.length - (start + EVENTS_PAGE_SIZE);
+
+    listEl.querySelector('.btn-more-events')?.remove();
+    listEl.querySelector('.races-disclaimer')?.remove();
+
+    const html = page.map(r => {
+      const distTags = (r.distances || []).map(d => `<span class="race-tag dist">${d}</span>`).join('');
+      const linkEl = r.link
+        ? `<a href="${r.link}" target="_blank" rel="noopener noreferrer" class="race-link"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> Ver inscrições</a>`
+        : `<p class="race-no-link">🔍 Pesquise o nome do evento</p>`;
+      const unconfirmed = !r.confirmed ? `<span class="race-tag type" style="background:rgba(255,77,77,0.1);color:#FF8080">Não confirmado</span>` : '';
+      return `<div class="race-card">
         <div class="race-card-top">
-          <div class="race-date-badge"><div class="day">${r.day || '--'}</div><div class="month">${r.month || '---'}</div></div>
+          <div class="race-date-badge"><div class="day">${r.day||'--'}</div><div class="month">${r.month||'---'}</div></div>
           <div class="race-info">
             <div class="race-name">${r.name}</div>
-            <div class="race-meta">${distTags}${r.type ? `<span class="race-tag type">${r.type}</span>` : ''}${r.location ? `<span class="race-tag city">📍 ${r.location}</span>` : ''}${unconfirmed}</div>
+            <div class="race-meta">${distTags}${r.type?`<span class="race-tag type">${r.type}</span>`:''}${r.location?`<span class="race-tag city">📍 ${r.location}</span>`:''}${unconfirmed}</div>
           </div>
         </div>
-        ${r.description ? `<p class="race-desc">${r.description}</p>` : ''}${linkEl}
+        ${r.description?`<p class="race-desc">${r.description}</p>`:''}${linkEl}
       </div>`;
-  }).join('');
+    }).join('');
 
-  if (_eventsPage === 0) {
-    listEl.innerHTML = html;
-  } else {
-    listEl.insertAdjacentHTML('beforeend', html);
-  }
+    if (_eventsPage === 0) {
+      listEl.innerHTML = html;
+    } else {
+      listEl.insertAdjacentHTML('beforeend', html);
+    }
 
-  if (hasMore) {
-    listEl.insertAdjacentHTML('beforeend', `
+    if (hasMore) {
+      listEl.insertAdjacentHTML('beforeend', `
         <button class="btn-more-events" onclick="window.loadMoreEvents()">
           📅 Ver mais ${Math.min(remaining, EVENTS_PAGE_SIZE)} eventos
-          <span style="color:var(--text-muted);font-size:11px;display:block;margin-top:3px">${remaining} evento${remaining !== 1 ? 's' : ''} restante${remaining !== 1 ? 's' : ''}</span>
+          <span style="color:var(--text-muted);font-size:11px;display:block;margin-top:3px">${remaining} restante${remaining!==1?'s':''}</span>
         </button>`);
-  }
+    }
 
-  listEl.insertAdjacentHTML('beforeend', `
+    listEl.insertAdjacentHTML('beforeend', `
       <div class="races-disclaimer">
         📍 Fontes: <a href="https://esportividade.com.br/corrida-de-rua/" target="_blank" style="color:var(--blue-300)">Esportividade</a> · <a href="https://prefeitura.sp.gov.br/web/esportes/w/corridas_de_rua/8722" target="_blank" style="color:var(--blue-300)">Prefeitura SP</a> · Confirme datas nos sites oficiais.
       </div>`);
-}
+  }
 
-window.loadMoreEvents = function () {
-  _eventsPage++;
-  const listEl = document.getElementById('races-list');
-  renderEventsPage(listEl);
-  // Scroll suave até o novo conteúdo
-  setTimeout(() => {
-    const cards = listEl.querySelectorAll('.race-card');
-    const firstNew = cards[_eventsPage * EVENTS_PAGE_SIZE];
-    if (firstNew) firstNew.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 100);
-};
+  window.loadMoreEvents = function() {
+    _eventsPage++;
+    const listEl = document.getElementById('races-list');
+    renderEventsPage(listEl);
+    setTimeout(() => {
+      const cards = listEl.querySelectorAll('.race-card');
+      const firstNew = cards[_eventsPage * EVENTS_PAGE_SIZE];
+      if (firstNew) firstNew.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
 
-async function searchRaces(city) {
-  const loadingEl = document.getElementById('races-loading');
-  const emptyEl = document.getElementById('races-empty');
-  const listEl = document.getElementById('races-list');
+  // ════════════════════════════════════════════════════════
+  // MENU HAMBURGUER
+  // ════════════════════════════════════════════════════════
+  const APP_VERSION = 'v1.5.0';
 
-  emptyEl.classList.add('hidden');
-  listEl.innerHTML = '';
-  loadingEl.classList.remove('hidden');
-  document.getElementById('races-loading-city').textContent = city;
+  function setupHamburgerMenu() {
+    const overlay = document.getElementById('hamburger-overlay');
+    const drawer  = document.getElementById('hamburger-drawer');
 
-  // Simula loading para melhor UX
-  await new Promise(r => setTimeout(r, 600));
+    // Abre o drawer
+    document.getElementById('btn-hamburger')?.addEventListener('click', openDrawer);
 
-  const cityKey = city.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-    .trim();
+    // Fecha ao clicar no overlay ou no X
+    overlay?.addEventListener('click', closeDrawer);
+    document.getElementById('btn-close-drawer')?.addEventListener('click', closeDrawer);
 
-  // Busca na database local (dados reais do Esportividade)
-  let races = null;
-  for (const key of Object.keys(RACES_DATABASE)) {
-    const normalizedKey = key.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (cityKey.includes(normalizedKey) || normalizedKey.includes(cityKey)) {
-      races = RACES_DATABASE[key];
-      break;
+    // Navegação pelos itens do drawer
+    document.querySelectorAll('.drawer-item[data-page]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        navigateTo(btn.dataset.page);
+        closeDrawer();
+      });
+    });
+
+    // Releases
+    document.getElementById('drawer-btn-releases')?.addEventListener('click', () => {
+      closeDrawer();
+      document.getElementById('modal-releases').classList.remove('hidden');
+    });
+    document.getElementById('btn-close-releases')?.addEventListener('click', () => {
+      document.getElementById('modal-releases').classList.add('hidden');
+    });
+
+    // Notificações via drawer
+    document.getElementById('drawer-btn-notifications')?.addEventListener('click', () => {
+      closeDrawer();
+      openNotifModal();
+    });
+
+    // Logout via drawer
+    document.getElementById('drawer-btn-logout')?.addEventListener('click', async () => {
+      const { auth, signOut } = window.__firebase;
+      closeDrawer();
+      await signOut(auth);
+    });
+
+    // Swipe para fechar (iOS)
+    let touchStartX = 0;
+    drawer?.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    drawer?.addEventListener('touchend', e => {
+      const diff = e.changedTouches[0].clientX - touchStartX;
+      if (diff < -60) closeDrawer(); // swipe left fecha
+    }, { passive: true });
+
+    // Define versão em todos os lugares
+    document.querySelectorAll('#drawer-version, #drawer-footer-version, .drawer-badge').forEach(el => {
+      el.textContent = APP_VERSION;
+    });
+
+    updateDrawerUser();
+  }
+
+  function openDrawer() {
+    document.getElementById('hamburger-overlay').classList.remove('hidden');
+    document.getElementById('hamburger-drawer').classList.remove('hidden');
+    // Pequeno delay para a animação funcionar
+    requestAnimationFrame(() => {
+      document.getElementById('hamburger-drawer').classList.add('open');
+      document.getElementById('hamburger-overlay').classList.add('open');
+    });
+    updateDrawerUser();
+    updateDrawerNotifBadge();
+  }
+
+  function closeDrawer() {
+    const drawer  = document.getElementById('hamburger-drawer');
+    const overlay = document.getElementById('hamburger-overlay');
+    drawer.classList.remove('open');
+    overlay.classList.remove('open');
+    setTimeout(() => {
+      drawer.classList.add('hidden');
+      overlay.classList.add('hidden');
+    }, 280);
+  }
+
+  function updateDrawerUser() {
+    const name  = State.userProfile?.name || State.user?.displayName || 'Atleta';
+    const email = State.user?.email || '';
+    const photo = State.userProfile?.photoURL;
+
+    const nameEl   = document.getElementById('drawer-user-name');
+    const emailEl  = document.getElementById('drawer-user-email');
+    const avatarEl = document.getElementById('drawer-avatar');
+
+    if (nameEl)  nameEl.textContent  = name;
+    if (emailEl) emailEl.textContent = email;
+    if (avatarEl) {
+      avatarEl.src = photo ? `${photo}?v=${Date.now()}` : getAvatarUrl(name);
     }
   }
 
-  if (races) {
-    // Filtra apenas eventos futuros
-    const today = new Date();
-    races = races.filter(r => {
-      if (!r.date || r.date.length < 8) return true; // sem data definida, mantém
-      const [d, m, y] = r.date.split('/');
-      return new Date(`${y}-${m}-${d}`) >= today;
+  function updateDrawerNotifBadge() {
+    const count = getNotifs().filter(n => !n.read).length;
+    const badge = document.getElementById('drawer-notif-badge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count > 9 ? '9+' : count;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  // ── PWA Service Worker Registration ───────────────────────
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW:', e));
     });
-    renderRaces(races, city);
-  } else {
-    // Cidade não coberta — mostra links úteis
-    renderRaces([
-      {
-        name: `Corridas em ${city} — Calendário Esportividade`,
-        date: '', day: '📅', month: new Date().getFullYear().toString(),
-        distances: ['Várias distâncias'],
-        type: 'Calendário',
-        location: city,
-        description: `O PaceRun cobre São Paulo e Guarulhos. Para ${city}, acesse o Esportividade para o calendário completo.`,
-        link: 'https://esportividade.com.br/corrida-de-rua/',
-        confirmed: true,
-      },
-      {
-        name: `Buscar corridas em ${city} ${new Date().getFullYear()}`,
-        date: '', day: '🔍', month: 'Google',
-        distances: [],
-        type: 'Pesquisa',
-        location: city,
-        description: `Toque para buscar eventos de corrida em ${city} diretamente no Google.`,
-        link: `https://www.google.com/search?q=corridas+de+rua+${encodeURIComponent(city)}+${new Date().getFullYear()}`,
-        confirmed: false,
-      },
-    ], city);
   }
-
-  loadingEl.classList.add('hidden');
-}
-
-function renderRaces(races, city) {
-  const listEl = document.getElementById('races-list');
-
-  if (!races || races.length === 0) {
-    listEl.innerHTML = `
-      <div class="races-empty" style="display:block">
-        <div style="font-size:48px;margin-bottom:12px">😔</div>
-        <p>Nenhuma corrida encontrada em <strong>${city}</strong>.<br>Tente uma cidade próxima.</p>
-      </div>`;
-    return;
-  }
-
-  listEl.innerHTML = races.map(r => {
-    const distTags = (r.distances || []).map(d =>
-      `<span class="race-tag dist">${d}</span>`
-    ).join('');
-
-    const linkEl = r.link && r.link !== 'null'
-      ? `<a href="${r.link}" target="_blank" rel="noopener noreferrer" class="race-link">
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-           Ver inscrições
-         </a>`
-      : `<p class="race-no-link">🔍 Pesquise o nome do evento para se inscrever</p>`;
-
-    const unconfirmedBadge = !r.confirmed
-      ? `<span class="race-tag type" style="background:rgba(255,77,77,0.1);color:#FF8080">Não confirmado</span>`
-      : '';
-
-    return `
-      <div class="race-card">
-        <div class="race-card-top">
-          <div class="race-date-badge">
-            <div class="day">${r.day || '--'}</div>
-            <div class="month">${r.month || '---'}</div>
-          </div>
-          <div class="race-info">
-            <div class="race-name">${r.name}</div>
-            <div class="race-meta">
-              ${distTags}
-              ${r.type ? `<span class="race-tag type">${r.type}</span>` : ''}
-              ${r.location ? `<span class="race-tag city">📍 ${r.location}</span>` : ''}
-              ${unconfirmedBadge}
-            </div>
-          </div>
-        </div>
-        ${r.description ? `<p class="race-desc">${r.description}</p>` : ''}
-        ${linkEl}
-      </div>`;
-  }).join('');
-
-  // Fonte dos dados
-  listEl.innerHTML += `
-    <div class="races-disclaimer">
-      📍 Dados reais de <a href="https://esportividade.com.br/corrida-de-rua/" target="_blank" rel="noopener" style="color:var(--blue-300)">esportividade.com.br</a> · Confirme inscrições nos links de cada evento.
-    </div>`;
-}
-
-// ── PWA Service Worker Registration ───────────────────────
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW:', e));
-  });
-}
