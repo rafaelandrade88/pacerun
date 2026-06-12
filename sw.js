@@ -4,7 +4,7 @@
    Atualizar CACHE_NAME a cada nova versão do app
    ═══════════════════════════════════════════════════ */
 
-const APP_VERSION = 'v1.5.0';
+const APP_VERSION = 'v1.6.0';
 const CACHE_NAME  = `pacerun-${APP_VERSION}`;
 
 const PRECACHE = [

@@ -480,6 +480,8 @@ function setupActivityPage() {
   // Start/Pause e Stop (nos controles fixos)
   document.getElementById('btn-start-stop').addEventListener('click', handleStartStop);
   document.getElementById('btn-stop').addEventListener('click', handleStop);
+  // Botão RETOMAR na tela de pausado (estilo Adidas)
+  document.getElementById('btn-resume-paused')?.addEventListener('click', resumeActivity);
 
   // Photo button
   document.getElementById('btn-photo-activity').addEventListener('click', () => {
@@ -540,32 +542,29 @@ function handleStartStop() {
 function startActivity() {
   if (!navigator.geolocation) { showToast('GPS não disponível neste dispositivo.'); return; }
 
-  State.activity.running = true;
-  State.activity.paused = false;
-  State.activity.startTime = Date.now();
+  State.activity.running  = true;
+  State.activity.paused   = false;
+  State.activity.startTime  = Date.now();
   State.activity.pausedTime = 0;
-  State.activity.positions = [];
-  State.activity.distance = 0;
-  State.activity.speeds = [];
-  State.activity.maxSpeed = 0;
-  State.activity.photo = null;
+  State.activity.positions  = [];
+  State.activity.distance   = 0;
+  State.activity.speeds     = [];
+  State.activity.recentSpeeds = [];
+  State.activity.maxSpeed   = 0;
+  State.activity.kmSplits   = [];
+  State.activity.photo      = null;
 
-  // Atualiza ícones
-  document.getElementById('icon-start').classList.add('hidden');
-  document.getElementById('icon-pause').classList.remove('hidden');
-  document.getElementById('icon-resume').classList.add('hidden');
-  document.getElementById('btn-start-stop').classList.add('running');
-  document.getElementById('btn-stop').disabled = false;
-
-  // Inicia mapa
+  // Mostra tela de corrida ativa
+  showActivityRunning();
   initMap();
-  document.getElementById('map-idle').classList.add('hidden');
-  document.querySelector('.gps-dot').classList.add('active');
+  document.getElementById('map-idle')?.classList.add('hidden');
+  document.querySelector('.gps-dot')?.classList.add('active');
 
-  // Timer
-  State.activity.intervalId = setInterval(updateActivityUI, 1000);
+  State.activity.intervalId = setInterval(() => {
+    updateActivityUI();
+    persistActivityState();
+  }, 1000);
 
-  // GPS Watch
   State.activity.watchId = navigator.geolocation.watchPosition(
     onPositionUpdate,
     err => console.warn('GPS error:', err),
@@ -573,72 +572,124 @@ function startActivity() {
   );
 }
 
+function showActivityRunning() {
+  // Esconde tela pausada, mostra mapa e controles de corrida
+  document.getElementById('activity-paused-screen')?.classList.add('hidden');
+  document.getElementById('activity-map')?.classList.remove('hidden');
+  document.getElementById('activity-controls-fixed')?.classList.add('visible');
+
+  const btnStart = document.getElementById('btn-start-stop');
+  if (btnStart) {
+    document.getElementById('icon-start')?.classList.add('hidden');
+    document.getElementById('icon-pause')?.classList.remove('hidden');
+    document.getElementById('icon-resume')?.classList.add('hidden');
+    btnStart.classList.add('running');
+  }
+  document.getElementById('btn-stop').disabled = false;
+}
+
 function pauseActivity() {
-  State.activity.paused = true;
+  State.activity.paused    = true;
   State.activity.pauseStart = Date.now();
   clearInterval(State.activity.intervalId);
   State.activity.intervalId = null;
 
-  document.getElementById('icon-pause').classList.add('hidden');
-  document.getElementById('icon-resume').classList.remove('hidden');
-  document.getElementById('btn-start-stop').classList.remove('running');
+  // Mostra a tela de pausado (estilo Adidas)
+  showActivityPaused();
+}
+
+function showActivityPaused() {
+  // Esconde controles normais
+  document.getElementById('activity-controls-fixed')?.classList.remove('visible');
+
+  // Atualiza a tela de pausado com os dados atuais
+  const dist     = State.activity.distance;
+  const elapsed  = computeElapsed();
+  const avgSpeed = dist > 0 && elapsed > 0 ? dist / (elapsed / 3600) : 0;
+  const pace     = avgSpeed > 0 ? 60 / avgSpeed : 0;
+  const paceMin  = Math.floor(pace);
+  const paceSec  = Math.round((pace - paceMin) * 60);
+  const paceStr  = dist >= 0.05 && pace >= 1 && pace <= 30
+    ? `${paceMin}:${String(paceSec).padStart(2,'0')}` : '--:--';
+
+  const el = document.getElementById('activity-paused-screen');
+  if (el) {
+    el.querySelector('#paused-duration').textContent  = formatDuration(elapsed);
+    el.querySelector('#paused-distance').textContent  = dist.toFixed(2);
+    el.querySelector('#paused-calories').textContent  = Math.round(calcCalories(dist, elapsed));
+    el.querySelector('#paused-pace').textContent      = paceStr;
+    el.classList.remove('hidden');
+  }
 }
 
 function resumeActivity() {
-  State.activity.paused = false;
+  State.activity.paused      = false;
   State.activity.pausedTime += Date.now() - State.activity.pauseStart;
 
-  document.getElementById('icon-pause').classList.remove('hidden');
-  document.getElementById('icon-resume').classList.add('hidden');
-  document.getElementById('btn-start-stop').classList.add('running');
-
-  State.activity.intervalId = setInterval(updateActivityUI, 1000);
+  showActivityRunning();
+  State.activity.intervalId = setInterval(() => {
+    updateActivityUI();
+    persistActivityState();
+  }, 1000);
 }
 
 function handleStop() {
   if (!State.activity.running) return;
 
-  // Para tudo
   clearInterval(State.activity.intervalId);
   navigator.geolocation.clearWatch(State.activity.watchId);
   State.activity.running = false;
-  State.activity.paused = false;
+  State.activity.paused  = false;
+  localStorage.removeItem('pacerun_active_run');
 
-  // Reseta botões
-  document.getElementById('icon-start').classList.remove('hidden');
-  document.getElementById('icon-pause').classList.add('hidden');
-  document.getElementById('icon-resume').classList.add('hidden');
-  document.getElementById('btn-start-stop').classList.remove('running');
+  // Reseta UI
+  document.getElementById('activity-paused-screen')?.classList.add('hidden');
+  document.getElementById('activity-controls-fixed')?.classList.add('visible');
+  document.getElementById('icon-start')?.classList.remove('hidden');
+  document.getElementById('icon-pause')?.classList.add('hidden');
+  document.getElementById('icon-resume')?.classList.add('hidden');
+  document.getElementById('btn-start-stop')?.classList.remove('running');
   document.getElementById('btn-stop').disabled = true;
-  document.querySelector('.gps-dot').classList.remove('active');
+  document.querySelector('.gps-dot')?.classList.remove('active');
 
-  // Calcula dados finais
+  // Calcula dados finais com limites plausíveis
   const duration = computeElapsed();
-  const dist = State.activity.distance;
-  const avgSpeed = dist > 0 && duration > 0 ? (dist / (duration / 3600)) : 0;
-  const pace = avgSpeed > 0 ? 60 / avgSpeed : 0;
-  const paceMin = Math.floor(pace);
-  const paceSec = Math.round((pace - paceMin) * 60);
+  const dist     = State.activity.distance;
+  const avgSpeed = dist > 0 && duration > 0 ? dist / (duration / 3600) : 0;
   const calories = calcCalories(dist, duration);
-  const weight = State.userProfile?.weight || 70;
+
+  // Pace com validação
+  const MIN_DIST = 0.05;
+  let paceStr = '--:--';
+  if (dist >= MIN_DIST && avgSpeed > 0) {
+    const pace = 60 / avgSpeed;
+    if (pace >= 1 && pace <= 30) {
+      paceStr = `${Math.floor(pace)}:${String(Math.round((pace - Math.floor(pace)) * 60)).padStart(2,'0')}`;
+    }
+  }
+
+  // Velocidade média histórica
+  const speeds   = State.activity.speeds;
+  const avgSpd   = speeds.length > 0 ? speeds.reduce((a,b)=>a+b,0)/speeds.length : 0;
 
   State.currentActivity = {
-    type: State.activity.type,
-    distance: dist,
+    type:      State.activity.type || 'running',
+    distance:  dist,
     duration,
-    avgSpeed,
-    maxSpeed: State.activity.maxSpeed,
-    pace: `${paceMin}:${String(paceSec).padStart(2, '0')}`,
+    avgSpeed:  avgSpd,
+    maxSpeed:  State.activity.maxSpeed,
+    pace:      paceStr,
     calories,
-    weight,
-    photo: State.activity.photo,
+    weight:    State.userProfile?.weight || 70,
+    photo:     State.activity.photo,
     positions: State.activity.positions,
-    kmSplits: State.activity.kmSplits || [],
+    kmSplits:  State.activity.kmSplits || [],
     timestamp: Date.now(),
   };
 
   showSummaryModal(State.currentActivity);
 }
+
 
 function onPositionUpdate(pos) {
   const { latitude, longitude, speed, accuracy } = pos.coords;
@@ -647,19 +698,25 @@ function onPositionUpdate(pos) {
   if (positions.length > 0) {
     const last = positions[positions.length - 1];
     const d = haversine(last.lat, last.lng, latitude, longitude);
-    if (d > 0.005 && accuracy < 50) {
+
+    // FIX: accuracy < 200 (era 50 — muito restrito, causava perda de 90% dos pontos)
+    // Filtro adicional: descarta saltos impossíveis (> 300m entre leituras)
+    const timeDiff = (Date.now() - (last.ts || Date.now())) / 1000 || 1;
+    const speedMs = (d * 1000) / timeDiff;
+    const plausible = speedMs < 15; // máx 54 km/h — impossível a pé
+
+    if (d > 0.003 && accuracy < 200 && plausible) {
       const prevDist = State.activity.distance;
       State.activity.distance += d;
 
-      // ── Rastreamento de pace por km ──────────────────────
+      // Rastreamento de pace por km
       if (!State.activity.kmSplits) State.activity.kmSplits = [];
       const prevKm = Math.floor(prevDist);
       const currKm = Math.floor(State.activity.distance);
       if (currKm > prevKm && currKm > 0) {
-        // Cruzou a marca de 1km — registra o pace deste km
         const elapsed = computeElapsed();
         const kmTime = elapsed - (State.activity.kmSplits.reduce((s, k) => s + k.secs, 0));
-        const pace = kmTime / 60; // min/km
+        const pace = kmTime / 60;
         const paceMin = Math.floor(pace);
         const paceSec = Math.round((pace - paceMin) * 60);
         State.activity.kmSplits.push({
@@ -669,20 +726,30 @@ function onPositionUpdate(pos) {
         });
       }
 
-      if (State.polyline) {
-        State.polyline.addLatLng([latitude, longitude]);
-      }
+      if (State.polyline) State.polyline.addLatLng([latitude, longitude]);
     }
   }
 
-  positions.push({ lat: latitude, lng: longitude });
+  positions.push({ lat: latitude, lng: longitude, ts: Date.now() });
 
-  const currentSpeed = speed != null ? speed * 3.6 : 0;
-  if (currentSpeed > 0) State.activity.speeds.push(currentSpeed);
-  if (currentSpeed > State.activity.maxSpeed) State.activity.maxSpeed = currentSpeed;
+  // Velocidade suavizada
+  const currentSpeed = speed != null && speed >= 0 ? speed * 3.6 : 0;
+  if (!State.activity.recentSpeeds) State.activity.recentSpeeds = [];
+  if (currentSpeed > 0 && currentSpeed < 54) {
+    State.activity.recentSpeeds.push(currentSpeed);
+    if (State.activity.recentSpeeds.length > 5) State.activity.recentSpeeds.shift();
+    State.activity.speeds.push(currentSpeed);
+    if (currentSpeed > State.activity.maxSpeed) State.activity.maxSpeed = currentSpeed;
+  }
 
-  document.getElementById('act-speed').textContent = currentSpeed.toFixed(1);
-  document.getElementById('act-max-speed').textContent = State.activity.maxSpeed.toFixed(1);
+  const smoothSpeed = State.activity.recentSpeeds.length > 0
+    ? State.activity.recentSpeeds.reduce((a, b) => a + b, 0) / State.activity.recentSpeeds.length
+    : 0;
+
+  const speedEl = document.getElementById('act-speed');
+  const maxEl   = document.getElementById('act-max-speed');
+  if (speedEl) speedEl.textContent = smoothSpeed.toFixed(1);
+  if (maxEl)   maxEl.textContent   = State.activity.maxSpeed.toFixed(1);
 
   if (State.map) {
     State.map.setView([latitude, longitude], 17);
@@ -690,8 +757,7 @@ function onPositionUpdate(pos) {
       State.userMarker.setLatLng([latitude, longitude]);
     } else {
       State.userMarker = window.L?.circleMarker([latitude, longitude], {
-        radius: 8, fillColor: '#5BFFA0', fillOpacity: 1,
-        color: '#1A6BF0', weight: 3
+        radius: 8, fillColor: '#5BFFA0', fillOpacity: 1, color: '#1A6BF0', weight: 3
       }).addTo(State.map);
     }
   }
@@ -841,56 +907,64 @@ async function saveActivity() {
   }
 }
 
+function buildMetricRow(icon, label, value) {
+  return `<div class="detail-metric-row">
+    <div class="detail-metric-icon">${icon}</div>
+    <div class="detail-metric-label">${label}</div>
+    <div class="detail-metric-value">${value}</div>
+  </div>`;
+}
+
+function buildKmSplitsHtml(kmSplits) {
+  if (!kmSplits || kmSplits.length === 0) return '';
+  return `<div class="detail-section">
+    <div class="detail-section-title">⚡ Pace por km</div>
+    ${kmSplits.map(s => {
+      const color = s.secs < 360 ? 'var(--green-neon)' : s.secs < 480 ? 'var(--amber)' : 'var(--blue-300)';
+      return `<div class="km-split-item">
+        <span class="km-split-label">KM ${s.km}</span>
+        <div class="km-split-bar-wrap">
+          <div class="km-split-bar" style="width:${Math.min(100,(480/Math.max(s.secs,1))*100)}%;background:${color}"></div>
+        </div>
+        <span class="km-split-pace" style="color:${color}">${s.pace}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 function showSummaryModal(act) {
   const container = document.getElementById('summary-stats');
 
-  // Splits por km
-  const splitsHtml = act.kmSplits && act.kmSplits.length > 0
-    ? `<div class="km-splits-section">
-        <h4 class="km-splits-title">⚡ Pace por km</h4>
-        <div class="km-splits-list">
-          ${act.kmSplits.map(s => {
-      // Classifica o pace: verde=rápido, amarelo=médio, vermelho=lento
-      const secs = s.secs;
-      const color = secs < 360 ? 'var(--green-neon)' : secs < 480 ? 'var(--amber)' : 'var(--blue-300)';
-      return `<div class="km-split-item">
-              <span class="km-split-label">KM ${s.km}</span>
-              <div class="km-split-bar-wrap">
-                <div class="km-split-bar" style="width:${Math.min(100, (480 / Math.max(secs, 1)) * 100)}%;background:${color}"></div>
-              </div>
-              <span class="km-split-pace" style="color:${color}">${s.pace}</span>
-            </div>`;
-    }).join('')}
-        </div>
-       </div>`
-    : '';
+  // Desidratação estimada: ~500ml por hora de corrida
+  const dehydration = Math.round((act.duration / 3600) * 500);
 
   container.innerHTML = `
-    <div class="summary-stat highlight">
-      <div class="v">${act.distance.toFixed(2)}</div>
-      <div class="l">km percorridos</div>
+    <!-- Métricas principais — 3 colunas estilo Adidas -->
+    <div class="summary-main-row">
+      <div class="summary-main-item">
+        <div class="summary-main-val">${(act.distance||0).toFixed(2)}</div>
+        <div class="summary-main-lbl">Distância (km)</div>
+      </div>
+      <div class="summary-main-item">
+        <div class="summary-main-val">${formatDuration(act.duration||0)}</div>
+        <div class="summary-main-lbl">Duração</div>
+      </div>
+      <div class="summary-main-item">
+        <div class="summary-main-val">${Math.round(act.calories||0)}</div>
+        <div class="summary-main-lbl">Calorias</div>
+      </div>
     </div>
-    <div class="summary-stat">
-      <div class="v">${formatDuration(act.duration)}</div>
-      <div class="l">duração</div>
+
+    <!-- Métricas detalhadas em lista estilo Adidas -->
+    <div class="detail-metrics">
+      ${buildMetricRow('⏱️', 'Ritmo médio', `${act.pace} min/km`)}
+      ${buildMetricRow('➡️', 'Velocidade média', `${(act.avgSpeed||0).toFixed(1)} kph`)}
+      ${buildMetricRow('⚡', 'Velocidade Máx.', `${(act.maxSpeed||0).toFixed(1)} kph`)}
+      ${buildMetricRow('💧', 'Desidratação estimada', `${dehydration} ml`)}
+      ${act.duration > 0 ? buildMetricRow('⏸️', 'Tempo de pausa', formatDuration(State.activity.pausedTime/1000||0)) : ''}
     </div>
-    <div class="summary-stat">
-      <div class="v">${act.pace}</div>
-      <div class="l">ritmo médio</div>
-    </div>
-    <div class="summary-stat">
-      <div class="v">${Math.round(act.calories)}</div>
-      <div class="l">kcal</div>
-    </div>
-    <div class="summary-stat">
-      <div class="v">${act.avgSpeed.toFixed(1)}</div>
-      <div class="l">km/h média</div>
-    </div>
-    <div class="summary-stat">
-      <div class="v">${act.maxSpeed.toFixed(1)}</div>
-      <div class="l">km/h máx</div>
-    </div>
-    ${splitsHtml}
+
+    ${buildKmSplitsHtml(act.kmSplits)}
   `;
 
   document.getElementById('summary-photo-preview').classList.add('hidden');
@@ -1135,8 +1209,237 @@ function setupCommunityTabs() {
 
 async function loadCommunity() {
   setupCommunityTabs();
-  loadCommunityRunners();
+  loadSocialFeed(); // aba PaceRunners agora é feed social
 }
+
+// ── FEED SOCIAL DA COMUNIDADE ─────────────────────────────
+async function loadSocialFeed() {
+  const { db, collection, getDocs, query, orderBy, limit, addDoc, serverTimestamp } = window.__firebase;
+  const listEl = document.getElementById('comm-runners-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Carregando...</p>';
+
+  try {
+    // Busca as 20 atividades mais recentes de todos os usuários
+    const q = query(collection(db, 'activities'), orderBy('timestamp', 'desc'), limit(20));
+    const snap = await getDocs(q);
+    const activities = [];
+    snap.forEach(d => activities.push({ id: d.id, ...d.data() }));
+
+    if (activities.length === 0) {
+      listEl.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--text-muted)">
+        <div style="font-size:40px;margin-bottom:12px">🏃</div>
+        <p>Nenhuma atividade ainda.<br>Complete sua primeira corrida e apareça aqui!</p>
+      </div>`;
+      return;
+    }
+
+    // Busca curtidas de cada atividade
+    const likesSnaps = await Promise.all(
+      activities.map(a =>
+        getDocs(collection(db, 'activities', a.id, 'likes')).catch(() => null)
+      )
+    );
+
+    listEl.innerHTML = activities.map((a, i) => {
+      const likesSnap = likesSnaps[i];
+      const likes = likesSnap ? likesSnap.size : 0;
+      const isMe  = a.userId === State.user?.uid;
+      const userLiked = likesSnap
+        ? likesSnap.docs.some(d => d.id === State.user?.uid)
+        : false;
+
+      const photoHtml = a.photoURL
+        ? `<img src="${a.photoURL}" class="social-post-photo" alt="foto da atividade" onclick="window.openActivityDetail('${a.id}')" />`
+        : '';
+
+      return `<div class="social-post" id="post-${a.id}">
+        <!-- Header do post -->
+        <div class="social-post-header">
+          <img class="social-avatar" src="${a.userPhotoURL || getAvatarUrl(a.userName||'U')}"
+               alt="${a.userName}" onerror="this.src='${getAvatarUrl(a.userName||'U')}'"/>
+          <div class="social-post-user">
+            <div class="social-post-name">${a.userName || 'Atleta'} ${isMe ? '<span style="color:var(--blue-300);font-size:11px">(você)</span>' : ''}</div>
+            <div class="social-post-time">${formatTimeAgo(a.timestamp?.seconds ? a.timestamp.seconds * 1000 : Date.now())}</div>
+          </div>
+          <span class="social-post-type">${a.type === 'running' ? '🏃' : '🚶'}</span>
+        </div>
+
+        <!-- Métricas compactas -->
+        <div class="social-post-metrics" onclick="window.openActivityDetail('${a.id}')">
+          <div class="social-metric">
+            <div class="social-metric-val">${(a.distance||0).toFixed(2)}</div>
+            <div class="social-metric-lbl">km</div>
+          </div>
+          <div class="social-metric">
+            <div class="social-metric-val">${formatDuration(a.duration||0)}</div>
+            <div class="social-metric-lbl">duração</div>
+          </div>
+          <div class="social-metric">
+            <div class="social-metric-val">${a.pace||'--:--'}</div>
+            <div class="social-metric-lbl">ritmo</div>
+          </div>
+          <div class="social-metric">
+            <div class="social-metric-val">${Math.round(a.calories||0)}</div>
+            <div class="social-metric-lbl">kcal</div>
+          </div>
+        </div>
+
+        ${photoHtml}
+
+        <!-- Ações: curtir e comentar -->
+        <div class="social-post-actions">
+          <button class="social-action-btn ${userLiked ? 'liked' : ''}"
+                  onclick="window.toggleLike('${a.id}', this)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="${userLiked ? 'currentColor' : 'none'}"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            <span id="likes-${a.id}">${likes}</span>
+          </button>
+          <button class="social-action-btn" onclick="window.openComments('${a.id}')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>Comentar</span>
+          </button>
+          <button class="social-action-btn" onclick="window.openActivityDetail('${a.id}')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <span>Detalhes</span>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+
+  } catch (e) {
+    console.error('loadSocialFeed error:', e);
+    listEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);text-align:center">Erro ao carregar feed.</p>';
+  }
+}
+
+// ── Curtir / Descurtir ────────────────────────────────────
+window.toggleLike = async function(activityId, btn) {
+  if (!State.user) return;
+  const { db, doc, setDoc, deleteDoc, getDoc } = window.__firebase;
+  const likeRef = doc(db, 'activities', activityId, 'likes', State.user.uid);
+
+  try {
+    const snap = await getDoc(likeRef);
+    const countEl = document.getElementById('likes-' + activityId);
+    const current = parseInt(countEl?.textContent || '0');
+
+    if (snap.exists()) {
+      await deleteDoc(likeRef);
+      btn.classList.remove('liked');
+      btn.querySelector('svg').setAttribute('fill', 'none');
+      if (countEl) countEl.textContent = Math.max(0, current - 1);
+    } else {
+      await setDoc(likeRef, { userId: State.user.uid, ts: Date.now() });
+      btn.classList.add('liked');
+      btn.querySelector('svg').setAttribute('fill', 'currentColor');
+      if (countEl) countEl.textContent = current + 1;
+    }
+  } catch (e) { console.error('toggleLike error:', e); }
+};
+
+// ── Comentários ───────────────────────────────────────────
+window.openComments = async function(activityId) {
+  const { db, collection, getDocs, addDoc, orderBy, query, serverTimestamp } = window.__firebase;
+
+  // Cria modal de comentários dinamicamente
+  let modal = document.getElementById('modal-comments');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-comments';
+    modal.className = 'modal-overlay hidden';
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-height:80vh;display:flex;flex-direction:column">
+        <div class="modal-handle"></div>
+        <h2 style="font-family:var(--font-display);font-size:20px;font-weight:800;margin-bottom:16px">Comentários</h2>
+        <div id="comments-list" style="flex:1;overflow-y:auto;margin-bottom:12px"></div>
+        <div class="comments-input-row">
+          <input type="text" id="comment-input" placeholder="Deixe um comentário..." class="comment-input"/>
+          <button id="btn-send-comment" class="btn-send-comment">Enviar</button>
+        </div>
+        <button class="btn-ghost" id="btn-close-comments" style="margin-top:8px">Fechar</button>
+      </div>`;
+    document.body.appendChild(modal);
+
+    document.getElementById('btn-close-comments').addEventListener('click', () => {
+      modal.classList.add('hidden');
+    });
+  }
+
+  modal._activityId = activityId;
+  modal.classList.remove('hidden');
+
+  // Carrega comentários
+  const listEl = document.getElementById('comments-list');
+  listEl.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Carregando...</p>';
+
+  try {
+    const q = query(collection(db, 'activities', activityId, 'comments'), orderBy('ts', 'asc'));
+    const snap = await getDocs(q);
+    const comments = [];
+    snap.forEach(d => comments.push({ id: d.id, ...d.data() }));
+
+    listEl.innerHTML = comments.length === 0
+      ? '<p style="color:var(--text-muted);text-align:center;padding:20px">Seja o primeiro a comentar!</p>'
+      : comments.map(c => `
+          <div class="comment-item">
+            <img class="comment-avatar" src="${c.userPhotoURL || getAvatarUrl(c.userName||'U')}" alt="${c.userName}"/>
+            <div class="comment-body">
+              <div class="comment-name">${c.userName || 'Atleta'}</div>
+              <div class="comment-text">${c.text}</div>
+              <div class="comment-time">${formatTimeAgo(c.ts)}</div>
+            </div>
+          </div>`).join('');
+
+    // Enviar comentário
+    const sendBtn = document.getElementById('btn-send-comment');
+    sendBtn.onclick = async () => {
+      const input = document.getElementById('comment-input');
+      const text = input.value.trim();
+      if (!text || !State.user) return;
+
+      sendBtn.disabled = true;
+      try {
+        const newComment = {
+          userId: State.user.uid,
+          userName: State.userProfile?.name || State.user.displayName || 'Atleta',
+          userPhotoURL: State.userProfile?.photoURL || '',
+          text,
+          ts: Date.now(),
+        };
+        await addDoc(collection(db, 'activities', activityId, 'comments'), newComment);
+        input.value = '';
+
+        // Adiciona o comentário na tela imediatamente
+        const div = document.createElement('div');
+        div.className = 'comment-item';
+        div.innerHTML = `
+          <img class="comment-avatar" src="${newComment.userPhotoURL || getAvatarUrl(newComment.userName)}" alt="${newComment.userName}"/>
+          <div class="comment-body">
+            <div class="comment-name">${newComment.userName}</div>
+            <div class="comment-text">${newComment.text}</div>
+            <div class="comment-time">agora mesmo</div>
+          </div>`;
+        listEl.appendChild(div);
+        listEl.scrollTop = listEl.scrollHeight;
+      } catch (err) {
+        showToast('Erro ao enviar comentário.');
+      } finally {
+        sendBtn.disabled = false;
+      }
+    };
+  } catch (e) {
+    listEl.innerHTML = '<p style="color:var(--text-muted);text-align:center">Erro ao carregar comentários.</p>';
+  }
+};
 
 async function loadCommunityRunners(searchTerm = '') {
   const { db, collection, getDocs, query, orderBy, limit, where } = window.__firebase;
@@ -1575,35 +1878,71 @@ async function loadRanking(type = 'distance') {
     }
   }
 
-  // Detalhe de atividade
+  // Detalhe de atividade — acessível por qualquer usuário
   window.openActivityDetail = async function (id) {
     const { db, doc, getDoc } = window.__firebase;
-    const snap = await getDoc(doc(db, 'activities', id));
-    if (!snap.exists()) return;
+    try {
+      const snap = await getDoc(doc(db, 'activities', id));
+      if (!snap.exists()) { showToast('Atividade não encontrada.'); return; }
 
-    const a = snap.data();
-    const content = document.getElementById('activity-detail-content');
-    content.innerHTML = `
-    <h2 class="modal-title">${a.type === 'running' ? '🏃 Corrida' : '🚶 Caminhada'}</h2>
-    <p style="text-align:center;color:var(--text-secondary);margin-bottom:20px">${formatDateFull(a.date)}</p>
-    ${a.photoURL ? `<img src="${a.photoURL}" style="width:100%;border-radius:12px;margin-bottom:16px;max-height:200px;object-fit:cover" alt="foto" />` : ''}
-    <div class="summary-stats">
-      <div class="summary-stat highlight"><div class="v">${a.distance.toFixed(2)}</div><div class="l">km</div></div>
-      <div class="summary-stat"><div class="v">${formatDuration(a.duration)}</div><div class="l">Duração</div></div>
-      <div class="summary-stat"><div class="v">${a.pace}</div><div class="l">Ritmo /km</div></div>
-      <div class="summary-stat"><div class="v">${Math.round(a.calories)}</div><div class="l">kcal</div></div>
-      <div class="summary-stat"><div class="v">${a.avgSpeed.toFixed(1)}</div><div class="l">km/h média</div></div>
-      <div class="summary-stat"><div class="v">${(a.maxSpeed || 0).toFixed(1)}</div><div class="l">km/h máx</div></div>
-    </div>
-  `;
+      const a    = snap.data();
+      const isMe = a.userId === State.user?.uid;
+      const dehydration = Math.round(((a.duration||0) / 3600) * 500);
+      const content = document.getElementById('activity-detail-content');
 
-    // Botão compartilhar detalhe
-    document.getElementById('btn-share-from-detail').onclick = () => {
-      document.getElementById('modal-activity-detail').classList.add('hidden');
-      openShareModal({ ...a, distance: a.distance, duration: a.duration });
-    };
+      content.innerHTML = `
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <h2 style="font-family:var(--font-display);font-size:22px;font-weight:800">
+            ${a.type === 'running' ? '🏃 Corrida' : '🚶 Caminhada'}
+          </h2>
+          ${!isMe ? `<div style="display:flex;align-items:center;gap:8px">
+            <img src="${a.userPhotoURL || getAvatarUrl(a.userName||'U')}" style="width:32px;height:32px;border-radius:50%;object-fit:cover" alt="${a.userName}"/>
+            <span style="font-size:13px;color:var(--text-secondary)">${a.userName||'Atleta'}</span>
+          </div>` : ''}
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">${formatDateFull(a.date)}</p>
 
-    document.getElementById('modal-activity-detail').classList.remove('hidden');
+        ${a.photoURL ? `<img src="${a.photoURL}" style="width:100%;border-radius:12px;margin-bottom:16px;max-height:220px;object-fit:cover" alt="foto da atividade"/>` : ''}
+
+        <!-- 3 métricas principais -->
+        <div class="summary-main-row">
+          <div class="summary-main-item">
+            <div class="summary-main-val">${(a.distance||0).toFixed(2)}</div>
+            <div class="summary-main-lbl">Distância (km)</div>
+          </div>
+          <div class="summary-main-item">
+            <div class="summary-main-val">${formatDuration(a.duration||0)}</div>
+            <div class="summary-main-lbl">Duração</div>
+          </div>
+          <div class="summary-main-item">
+            <div class="summary-main-val">${Math.round(a.calories||0)}</div>
+            <div class="summary-main-lbl">Calorias</div>
+          </div>
+        </div>
+
+        <!-- Métricas detalhadas -->
+        <div class="detail-metrics">
+          ${buildMetricRow('⏱️', 'Ritmo médio',        `${a.pace||'--:--'} min/km`)}
+          ${buildMetricRow('➡️', 'Velocidade média',   `${(a.avgSpeed||0).toFixed(1)} kph`)}
+          ${buildMetricRow('⚡', 'Velocidade Máx.',    `${(a.maxSpeed||0).toFixed(1)} kph`)}
+          ${buildMetricRow('💧', 'Desidratação estimada', `${dehydration} ml`)}
+        </div>
+
+        ${buildKmSplitsHtml(a.kmSplits)}
+      `;
+
+      // Botão compartilhar
+      document.getElementById('btn-share-from-detail').onclick = () => {
+        document.getElementById('modal-activity-detail').classList.add('hidden');
+        openShareModal({ ...a });
+      };
+
+      document.getElementById('modal-activity-detail').classList.remove('hidden');
+    } catch (e) {
+      console.error('openActivityDetail error:', e);
+      showToast('Erro ao carregar atividade.');
+    }
   };
 
   document.getElementById('btn-close-detail')?.addEventListener('click', () => {
@@ -1782,17 +2121,19 @@ async function loadRanking(type = 'distance') {
     const preview = document.getElementById('share-preview');
     const a = activity;
 
+    const paceValido = a.pace && a.pace !== '--:--' && (a.distance||0) >= 0.05;
+
     preview.innerHTML = `
-    <div style="padding:20px;background:var(--blue-900);border-radius:12px">
-      <div style="font-family:var(--font-display);font-size:40px;font-weight:800;color:var(--white)">${a.distance?.toFixed(2) || '0.00'} <span style="font-size:20px;color:var(--blue-300)">km</span></div>
-      <div style="display:flex;gap:20px;justify-content:center;margin-top:12px">
-        <div><div style="font-size:18px;font-weight:700">${a.pace || '--:--'}</div><div style="font-size:11px;color:var(--text-muted)">Ritmo</div></div>
-        <div><div style="font-size:18px;font-weight:700">${formatDuration(a.duration || 0)}</div><div style="font-size:11px;color:var(--text-muted)">Duração</div></div>
-        <div><div style="font-size:18px;font-weight:700">${Math.round(a.calories || 0)}</div><div style="font-size:11px;color:var(--text-muted)">kcal</div></div>
-      </div>
-      <div style="margin-top:12px;font-size:13px;color:var(--text-secondary)">via PaceRun 🏃</div>
-    </div>
-  `;
+      ${a.photoURL ? `<img src="${a.photoURL}" style="width:100%;border-radius:10px;margin-bottom:12px;max-height:180px;object-fit:cover" alt="foto"/>` : ''}
+      <div style="padding:16px;background:var(--blue-900);border-radius:12px;text-align:center">
+        <div style="font-family:var(--font-display);font-size:40px;font-weight:800;color:var(--white)">${(a.distance||0).toFixed(2)} <span style="font-size:20px;color:var(--blue-300)">km</span></div>
+        <div style="display:flex;gap:16px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+          ${paceValido ? `<div><div style="font-size:16px;font-weight:700">${a.pace}</div><div style="font-size:11px;color:var(--text-muted)">Ritmo</div></div>` : ''}
+          <div><div style="font-size:16px;font-weight:700">${formatDuration(a.duration||0)}</div><div style="font-size:11px;color:var(--text-muted)">Duração</div></div>
+          <div><div style="font-size:16px;font-weight:700">${Math.round(a.calories||0)}</div><div style="font-size:11px;color:var(--text-muted)">kcal</div></div>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:var(--text-secondary)">via PaceRun 🏃</div>
+      </div>`;
 
     document.getElementById('modal-share').classList.remove('hidden');
   }
@@ -1800,7 +2141,21 @@ async function loadRanking(type = 'distance') {
   function buildShareText() {
     const a = State.currentActivity;
     if (!a) return '';
-    return `🏃 Acabei de completar ${a.distance?.toFixed(2) || '0'} km em ${formatDuration(a.duration || 0)}!\n⚡ Ritmo: ${a.pace || '--'} /km | 🔥 ${Math.round(a.calories || 0)} kcal\n\nvia PaceRun`;
+    const paceValido = a.pace && a.pace !== '--:--' && (a.distance||0) >= 0.05;
+    const paceInfo   = paceValido ? `⚡ Ritmo: ${a.pace} /km | ` : '';
+    return `🏃 Acabei de completar ${(a.distance||0).toFixed(2)} km em ${formatDuration(a.duration||0)}!\n${paceInfo}🔥 ${Math.round(a.calories||0)} kcal\n\nvia PaceRun`;
+  }
+
+  async function buildShareFiles() {
+    // Tenta compartilhar a foto junto com o texto se disponível
+    const a = State.currentActivity;
+    if (!a?.photoURL) return null;
+    try {
+      const resp = await fetch(a.photoURL);
+      const blob = await resp.blob();
+      const file = new File([blob], 'pacerun-corrida.jpg', { type: 'image/jpeg' });
+      return [file];
+    } catch { return null; }
   }
 
   function shareWhatsApp() {
@@ -1808,26 +2163,46 @@ async function loadRanking(type = 'distance') {
     window.open(`https://wa.me/?text=${text}`, '_blank');
   }
 
-  function shareInstagramStories() {
-    // Instagram Stories só aceita via app nativo
-    if (navigator.share) {
+  async function shareInstagramStories() {
+    // Instagram: tenta Web Share API com arquivo de imagem
+    const files = await buildShareFiles();
+    if (navigator.canShare && files && navigator.canShare({ files })) {
+      navigator.share({ files, title: 'Minha corrida no PaceRun', text: buildShareText() })
+        .catch(() => fallbackShare('Instagram'));
+    } else if (navigator.share) {
       navigator.share({ title: 'Minha corrida no PaceRun', text: buildShareText() })
-        .catch(() => showToast('Compartilhamento cancelado.'));
+        .catch(() => fallbackShare('Instagram'));
     } else {
-      copyToClipboard(buildShareText());
-      showToast('Texto copiado! Cole no Instagram Stories 📋');
+      fallbackShare('Instagram');
     }
   }
 
-  function shareFacebook() {
+  function fallbackShare(platform) {
     copyToClipboard(buildShareText());
-    showToast('Texto copiado! Cole no Facebook Stories 📋');
+    showToast(`Texto copiado! Abra o ${platform} e cole 📋`, 4000);
   }
 
-  function shareNative() {
+  function shareFacebook() {
     if (navigator.share) {
-      navigator.share({ title: 'Minha atividade no PaceRun', text: buildShareText() })
-        .catch(() => { });
+      navigator.share({ title: 'Minha corrida no PaceRun', text: buildShareText() })
+        .catch(() => fallbackShare('Facebook'));
+    } else {
+      fallbackShare('Facebook');
+    }
+  }
+
+  async function shareNative() {
+    const files = await buildShareFiles();
+    const shareData = {
+      title: 'Minha atividade no PaceRun',
+      text: buildShareText(),
+      ...(files && navigator.canShare?.({ files }) ? { files } : {}),
+    };
+    if (navigator.share) {
+      navigator.share(shareData).catch(() => {
+        copyToClipboard(buildShareText());
+        showToast('Texto copiado!');
+      });
     } else {
       copyToClipboard(buildShareText());
       showToast('Texto copiado para a área de transferência!');
@@ -1836,7 +2211,7 @@ async function loadRanking(type = 'distance') {
 
   function copyToClipboard(text) {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).catch(() => { });
+      navigator.clipboard.writeText(text).catch(() => {});
     }
   }
 
@@ -2210,7 +2585,7 @@ async function loadRanking(type = 'distance') {
   // ════════════════════════════════════════════════════════
   // MENU HAMBURGUER
   // ════════════════════════════════════════════════════════
-  const APP_VERSION = 'v1.5.0';
+  const APP_VERSION = 'v1.6.0';
 
   function setupHamburgerMenu() {
     const overlay = document.getElementById('hamburger-overlay');

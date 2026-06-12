@@ -188,10 +188,11 @@
           <span class="notif-badge hidden" id="notif-badge">0</span>
         </button>
         <button class="icon-btn" id="btn-hamburger" aria-label="Menu">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6"/>
-            <line x1="3" y1="12" x2="21" y2="12"/>
-            <line x1="3" y1="18" x2="21" y2="18"/>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
       </div>
@@ -202,7 +203,7 @@
 
       <!-- ── PAGE: ATIVIDADE ── -->
       <section id="page-activity" class="page active">
-        <!-- Stats no topo -->
+        <!-- Stats no topo — só 4 métricas -->
         <div class="activity-stats-grid">
           <div class="stat-card main-stat">
             <span class="stat-value" id="act-distance">0.00</span>
@@ -222,6 +223,7 @@
             <span class="stat-label">kcal</span>
           </div>
         </div>
+
         <!-- Mapa ocupa o restante -->
         <div class="activity-map" id="activity-map">
           <div class="map-overlay" id="map-idle">
@@ -240,18 +242,37 @@
           </div>
           <!-- Velocidades sobrepostas no mapa -->
           <div class="speed-overlay">
-            <div class="speed-item-sm">
-              <span id="act-speed">0.0</span>
-              <label>km/h</label>
+            <div class="speed-item-sm"><span id="act-speed">0.0</span><label>km/h</label></div>
+            <div class="speed-item-sm"><span id="act-avg-speed">0.0</span><label>média</label></div>
+            <div class="speed-item-sm"><span id="act-max-speed">0.0</span><label>máx</label></div>
+          </div>
+        </div>
+
+        <!-- TELA DE PAUSADO — estilo Adidas (oculta por padrão) -->
+        <div id="activity-paused-screen" class="activity-paused-screen hidden">
+          <div class="paused-header">PAUSADO</div>
+          <div class="paused-duration" id="paused-duration">00:00</div>
+          <div class="paused-label">Duração</div>
+          <div class="paused-metrics-row">
+            <div class="paused-metric">
+              <div class="paused-metric-val" id="paused-distance">0.00</div>
+              <div class="paused-metric-lbl">Distância (km)</div>
             </div>
-            <div class="speed-item-sm">
-              <span id="act-avg-speed">0.0</span>
-              <label>média</label>
+            <div class="paused-metric">
+              <div class="paused-metric-val" id="paused-calories">0</div>
+              <div class="paused-metric-lbl">Calorias (kcal)</div>
             </div>
-            <div class="speed-item-sm">
-              <span id="act-max-speed">0.0</span>
-              <label>máx</label>
+            <div class="paused-metric">
+              <div class="paused-metric-val" id="paused-pace">--:--</div>
+              <div class="paused-metric-lbl">Ritmo médio (min/km)</div>
             </div>
+          </div>
+          <!-- Mapa na tela pausada -->
+          <div class="paused-map-area" id="paused-map-area"></div>
+          <!-- Botões CONCLUIR e RETOMAR -->
+          <div class="paused-actions">
+            <button class="paused-btn paused-btn-stop" id="btn-stop">CONCLUIR</button>
+            <button class="paused-btn paused-btn-resume" id="btn-resume-paused">RETOMAR</button>
           </div>
         </div>
       </section>
@@ -515,9 +536,10 @@
     <div class="drawer-header">
       <div class="drawer-logo">
         <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
-          <rect width="64" height="64" rx="18" fill="#1A6BF0"/>
-          <path d="M18 44 L28 20 L36 34 L42 26 L48 44" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <circle cx="18" cy="44" r="3" fill="#5BFFA0"/>
+          <rect width="64" height="64" rx="18" fill="#1A6BF0" />
+          <path d="M18 44 L28 20 L36 34 L42 26 L48 44" stroke="white" stroke-width="3.5" stroke-linecap="round"
+            stroke-linejoin="round" fill="none" />
+          <circle cx="18" cy="44" r="3" fill="#5BFFA0" />
         </svg>
         <div>
           <div class="drawer-app-name">PaceRun</div>
@@ -525,13 +547,18 @@
         </div>
       </div>
       <button class="drawer-close" id="btn-close-drawer">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
       </button>
     </div>
 
     <!-- Info do usuário -->
     <div class="drawer-user" id="drawer-user">
-      <img id="drawer-avatar" class="drawer-avatar" src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=64" alt="avatar"/>
+      <img id="drawer-avatar" class="drawer-avatar"
+        src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=64" alt="avatar" />
       <div>
         <div class="drawer-user-name" id="drawer-user-name">Atleta</div>
         <div class="drawer-user-email" id="drawer-user-email"></div>
@@ -542,27 +569,53 @@
     <div class="drawer-section-title">Navegação</div>
     <nav class="drawer-nav">
       <button class="drawer-item" data-page="feed">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
         Feed
       </button>
       <button class="drawer-item" data-page="community">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
         Comunidade
       </button>
       <button class="drawer-item" data-page="activity">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg>
         Atividade
       </button>
       <button class="drawer-item" data-page="ranking">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
         Ranking
       </button>
       <button class="drawer-item" data-page="progress">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </svg>
         Progresso
       </button>
       <button class="drawer-item" data-page="profile">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
         Perfil
       </button>
     </nav>
@@ -571,17 +624,31 @@
     <div class="drawer-section-title">Aplicativo</div>
     <div class="drawer-nav">
       <button class="drawer-item" id="drawer-btn-releases">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
         Novidades & Versão
         <span class="drawer-badge">v1.5.0</span>
       </button>
       <button class="drawer-item" id="drawer-btn-notifications">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
         Notificações
         <span class="notif-badge hidden drawer-notif-badge" id="drawer-notif-badge">0</span>
       </button>
       <button class="drawer-item" id="drawer-btn-logout">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF4D4D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF4D4D" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
         <span style="color:#FF4D4D">Sair da conta</span>
       </button>
     </div>

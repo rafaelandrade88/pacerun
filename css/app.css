@@ -2823,3 +2823,221 @@ body {
   font-size: 13px; color: var(--text-secondary);
   line-height: 1.5; padding-left: 4px;
 }
+/* ═══════════════════════════════════════════════════════
+   PACERUN v1.6.0 — CSS adicional
+   ═══════════════════════════════════════════════════════ */
+
+/* ── TELA PAUSADO ESTILO ADIDAS ──────────────────────────── */
+.activity-paused-screen {
+  position: absolute; inset: 0; z-index: 20;
+  background: var(--blue-900);
+  display: flex; flex-direction: column;
+  align-items: center;
+  padding: 20px 20px 0;
+}
+.activity-paused-screen.hidden { display: none; }
+
+.paused-header {
+  font-family: var(--font-display);
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 3px; color: var(--text-muted);
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.paused-duration {
+  font-family: var(--font-display);
+  font-size: 64px; font-weight: 800;
+  color: var(--white); line-height: 1;
+}
+.paused-label {
+  font-size: 13px; color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+.paused-metrics-row {
+  display: flex; gap: 0; width: 100%;
+  border-top: 0.5px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
+  margin-bottom: 16px;
+}
+.paused-metric {
+  flex: 1; padding: 14px 8px; text-align: center;
+  border-right: 0.5px solid var(--border);
+}
+.paused-metric:last-child { border-right: none; }
+.paused-metric-val {
+  font-family: var(--font-display);
+  font-size: 22px; font-weight: 800; color: var(--white);
+}
+.paused-metric-lbl {
+  font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase; margin-top: 2px;
+}
+.paused-map-area {
+  flex: 1; width: 100%;
+  background: var(--surface2);
+  border-radius: 12px; overflow: hidden;
+  margin-bottom: 16px; min-height: 120px;
+}
+.paused-actions {
+  display: flex; gap: 12px; width: 100%;
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+  padding-top: 4px;
+}
+.paused-btn {
+  flex: 1; padding: 18px;
+  border: none; border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 16px; font-weight: 800;
+  letter-spacing: 1px; cursor: pointer;
+  text-transform: uppercase;
+  transition: var(--transition);
+}
+.paused-btn:active { transform: scale(0.97); }
+.paused-btn-stop   { background: #E53935; color: white; }
+.paused-btn-resume { background: #43A047; color: white; }
+
+/* ── RESUMO ESTILO ADIDAS ────────────────────────────────── */
+.summary-main-row {
+  display: flex; gap: 0;
+  border-top: 0.5px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
+  margin-bottom: 16px;
+}
+.summary-main-item {
+  flex: 1; padding: 14px 8px; text-align: center;
+  border-right: 0.5px solid var(--border);
+}
+.summary-main-item:last-child { border-right: none; }
+.summary-main-val {
+  font-family: var(--font-display);
+  font-size: 22px; font-weight: 800; color: var(--white);
+}
+.summary-main-lbl {
+  font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase; margin-top: 2px;
+}
+.detail-metrics {
+  display: flex; flex-direction: column;
+  border-top: 0.5px solid var(--border);
+}
+.detail-metric-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.detail-metric-icon { font-size: 20px; width: 28px; flex-shrink: 0; }
+.detail-metric-label {
+  flex: 1; font-size: 14px; font-weight: 500;
+  color: var(--text-secondary);
+}
+.detail-metric-value {
+  font-size: 14px; font-weight: 700;
+  color: var(--white);
+}
+.detail-section { margin-top: 16px; }
+.detail-section-title {
+  font-family: var(--font-display); font-size: 16px;
+  font-weight: 700; margin-bottom: 12px;
+}
+
+/* ── FEED SOCIAL ─────────────────────────────────────────── */
+.social-post {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.social-post-header {
+  display: flex; align-items: center; gap: 10px;
+}
+.social-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+  border: 2px solid var(--surface2);
+}
+.social-post-user { flex: 1; }
+.social-post-name { font-weight: 600; font-size: 14px; }
+.social-post-time { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.social-post-type { font-size: 20px; }
+
+.social-post-metrics {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--surface2); border-radius: 10px;
+  padding: 10px 0; cursor: pointer;
+  transition: var(--transition);
+}
+.social-post-metrics:hover { background: var(--surface3); }
+.social-metric { text-align: center; }
+.social-metric-val {
+  font-family: var(--font-display);
+  font-size: 16px; font-weight: 800;
+}
+.social-metric-lbl {
+  font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase;
+}
+.social-post-photo {
+  width: 100%; border-radius: 10px;
+  max-height: 200px; object-fit: cover;
+  cursor: pointer;
+}
+.social-post-actions {
+  display: flex; gap: 8px;
+  border-top: 0.5px solid var(--border);
+  padding-top: 10px;
+}
+.social-action-btn {
+  display: flex; align-items: center; gap: 6px;
+  flex: 1; justify-content: center;
+  background: transparent; border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-body); font-size: 13px;
+  cursor: pointer; padding: 6px;
+  border-radius: 8px; transition: var(--transition);
+}
+.social-action-btn:hover { background: var(--surface2); }
+.social-action-btn.liked { color: #FF4D4D; }
+
+/* ── COMENTÁRIOS ─────────────────────────────────────────── */
+.comments-input-row {
+  display: flex; gap: 8px; margin-top: 8px;
+}
+.comment-input {
+  flex: 1; background: var(--blue-900);
+  border: 1px solid var(--border);
+  border-radius: 20px; padding: 10px 16px;
+  color: var(--text-primary); font-family: var(--font-body);
+  font-size: 14px; outline: none;
+}
+.btn-send-comment {
+  background: var(--blue-500); border: none;
+  border-radius: 20px; padding: 10px 16px;
+  color: white; font-family: var(--font-body);
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.comment-item {
+  display: flex; gap: 10px; padding: 10px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.comment-item:last-child { border-bottom: none; }
+.comment-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+}
+.comment-name { font-size: 13px; font-weight: 600; }
+.comment-text { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+.comment-time { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── BOTÃO MAIS EVENTOS ──────────────────────────────────── */
+.btn-more-events {
+  width: 100%; padding: 14px;
+  background: var(--surface2);
+  border: 1.5px dashed var(--blue-500);
+  border-radius: var(--radius-sm);
+  color: var(--blue-300);
+  font-family: var(--font-display); font-size: 16px; font-weight: 700;
+  cursor: pointer; text-align: center; transition: var(--transition);
+}
+.btn-more-events:hover  { background: rgba(26,107,240,0.15); }
+.btn-more-events:active { transform: scale(0.98); }
