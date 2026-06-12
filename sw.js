@@ -1,11 +1,9 @@
 /* ═══════════════════════════════════════════════════
-   PACERUN — Service Worker v1.5.0
-   Cache estratégico para funcionamento offline
-   Atualizar CACHE_NAME a cada nova versão do app
+   PACERUN — Service Worker v1.6.0
    ═══════════════════════════════════════════════════ */
 
 const APP_VERSION = 'v1.6.0';
-const CACHE_NAME  = `pacerun-${APP_VERSION}`;
+const CACHE_NAME = `pacerun-${APP_VERSION}`;
 
 const PRECACHE = [
   '/pacerun/',
@@ -15,32 +13,33 @@ const PRECACHE = [
   '/pacerun/manifest.json',
 ];
 
-// Install: pré-cache dos assets principais
+// Install: pré-cache dos assets
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE))
   );
-  self.skipWaiting(); // ativa imediatamente sem esperar fechar abas
+  self.skipWaiting(); // força ativação imediata
 });
 
-// Activate: limpa caches de versões anteriores
+// Activate: APAGA TODOS os caches antigos (pacerun-v1, pacerun-v2, etc.)
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
+    caches.keys().then(keys => {
+      console.log('[SW v1.6.0] Caches encontrados:', keys);
+      return Promise.all(
         keys
-          .filter(k => k.startsWith('pacerun-') && k !== CACHE_NAME)
+          .filter(k => k !== CACHE_NAME) // deleta tudo exceto o atual
           .map(k => {
-            console.log('[SW] Removendo cache antigo:', k);
+            console.log('[SW v1.6.0] Deletando cache antigo:', k);
             return caches.delete(k);
           })
-      )
-    )
+      );
+    })
   );
-  self.clients.claim(); // assume controle de todas as abas imediatamente
+  self.clients.claim(); // assume controle de todas as abas
 });
 
-// Fetch: Cache-first para assets locais, pass-through para APIs
+// Fetch: network-first para garantir sempre versão atualizada
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
@@ -52,38 +51,39 @@ self.addEventListener('fetch', event => {
     url.hostname.includes('nominatim') ||
     url.hostname.includes('cloudinary') ||
     url.hostname.includes('allorigins') ||
-    url.hostname.includes('tile.openstreetmap')
+    url.hostname.includes('tile.openstreetmap') ||
+    url.hostname.includes('unpkg.com') ||
+    url.hostname.includes('gstatic.com') ||
+    url.hostname.includes('ui-avatars.com') ||
+    url.hostname.includes('fonts.googleapis.com') ||
+    url.hostname.includes('fonts.gstatic.com')
   ) {
     return;
   }
 
-  // Cache-first para assets locais
+  // Network-first: tenta buscar da rede sempre, fallback para cache
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-
-      return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type === 'opaque') {
-          return response;
-        }
+    fetch(event.request)
+      .then(response => {
+        if (!response || response.status !== 200) return response;
         const clone = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         return response;
-      }).catch(() => {
-        // Offline fallback: retorna o index.html para navegação
-        if (event.request.mode === 'navigate') {
-          return caches.match('/pacerun/index.html');
-        }
-      });
-    })
+      })
+      .catch(() => {
+        return caches.match(event.request).then(cached => {
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') {
+            return caches.match('/pacerun/index.html');
+          }
+        });
+      })
   );
 });
 
-// Mensagem da página para o SW (ex: forçar atualização)
+// Responde mensagens do app
 self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
   if (event.data?.type === 'GET_VERSION') {
     event.source?.postMessage({ type: 'VERSION', version: APP_VERSION });
   }
