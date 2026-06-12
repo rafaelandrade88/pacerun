@@ -24,7 +24,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     // Firebase Storage removido — usando Cloudinary (gratuito, sem cartão)
 
     // ── CONFIGURE YOUR FIREBASE PROJECT HERE ──────────────────────────────
@@ -44,7 +44,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    window.__firebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp };
+    window.__firebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential, doc, setDoc, getDoc, deleteDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp };
 
     window.dispatchEvent(new Event('firebase-ready'));
   </script>
@@ -171,7 +171,7 @@
     <!-- TOP HEADER -->
     <header class="app-header" id="app-header">
       <div class="header-left">
-        <img id="header-avatar" class="header-avatar"
+        <img id="header-avatar" class="header-avatar" style="cursor:pointer" onclick="openDrawer()"
           src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=64" alt="avatar" />
         <div>
           <p class="header-greeting">Bom dia,</p>
@@ -271,7 +271,7 @@
           <div class="paused-map-area" id="paused-map-area"></div>
           <!-- Botões CONCLUIR e RETOMAR -->
           <div class="paused-actions">
-            <button class="paused-btn paused-btn-stop" id="btn-stop">CONCLUIR</button>
+            <button class="paused-btn paused-btn-stop" id="btn-concluir">CONCLUIR</button>
             <button class="paused-btn paused-btn-resume" id="btn-resume-paused">RETOMAR</button>
           </div>
         </div>
@@ -543,7 +543,7 @@
         </svg>
         <div>
           <div class="drawer-app-name">PaceRun</div>
-          <div class="drawer-version" id="drawer-version">v1.5.0</div>
+          <div class="drawer-version" id="drawer-version">v1.6.0</div>
         </div>
       </div>
       <button class="drawer-close" id="btn-close-drawer">
@@ -631,7 +631,7 @@
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
         Novidades & Versão
-        <span class="drawer-badge">v1.5.0</span>
+        <span class="drawer-badge">v1.6.0</span>
       </button>
       <button class="drawer-item" id="drawer-btn-notifications">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -655,7 +655,7 @@
 
     <!-- Rodapé -->
     <div class="drawer-footer">
-      <p>PaceRun <span id="drawer-footer-version">v1.5.0</span></p>
+      <p>PaceRun <span id="drawer-footer-version">v1.6.0</span></p>
       <p style="margin-top:2px">Feito com ❤️ para corredores</p>
     </div>
   </div>
