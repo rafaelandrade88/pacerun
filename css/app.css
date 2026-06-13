@@ -429,6 +429,8 @@ body {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  position: relative;
+  /* ancora telas absolutas filhas */
 }
 
 /* ── PAGE HEADER ─────────────────────────────────────── */
@@ -2931,7 +2933,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  overflow: hidden;
+  /* evita scroll interno */
+  /* padding bottom garante que botões fiquem acima da nav */
   padding: 20px 20px 0;
+  box-sizing: border-box;
 }
 
 .activity-paused-screen.hidden {
@@ -2950,7 +2956,7 @@ body {
 
 .paused-duration {
   font-family: var(--font-display);
-  font-size: 64px;
+  font-size: 56px;
   font-weight: 800;
   color: var(--white);
   line-height: 1;
@@ -2959,7 +2965,7 @@ body {
 .paused-label {
   font-size: 13px;
   color: var(--text-secondary);
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .paused-metrics-row {
@@ -2968,12 +2974,13 @@ body {
   width: 100%;
   border-top: 0.5px solid var(--border);
   border-bottom: 0.5px solid var(--border);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .paused-metric {
   flex: 1;
-  padding: 14px 8px;
+  padding: 10px 8px;
   text-align: center;
   border-right: 0.5px solid var(--border);
 }
@@ -2984,13 +2991,13 @@ body {
 
 .paused-metric-val {
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--white);
 }
 
 .paused-metric-lbl {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-muted);
   text-transform: uppercase;
   margin-top: 2px;
@@ -3002,21 +3009,26 @@ body {
   background: var(--surface2);
   border-radius: 12px;
   overflow: hidden;
-  margin-bottom: 16px;
-  min-height: 120px;
+  margin-bottom: 12px;
+  min-height: 80px;
+  /* mínimo para não sumir */
+  max-height: 200px;
+  /* limita para botões sempre aparecerem */
 }
 
 .paused-actions {
   display: flex;
   gap: 12px;
   width: 100%;
-  padding-bottom: env(safe-area-inset-bottom, 16px);
+  flex-shrink: 0;
+  /* NUNCA encolhe — sempre visível */
+  padding-bottom: max(env(safe-area-inset-bottom, 12px), 12px);
   padding-top: 4px;
 }
 
 .paused-btn {
   flex: 1;
-  padding: 18px;
+  padding: 16px;
   border: none;
   border-radius: 8px;
   font-family: var(--font-display);
@@ -3026,6 +3038,8 @@ body {
   cursor: pointer;
   text-transform: uppercase;
   transition: var(--transition);
+  min-height: 54px;
+  /* garante área de toque mínima */
 }
 
 .paused-btn:active {
@@ -3325,150 +3339,6 @@ body {
 
 .btn-more-events:active {
   transform: scale(0.98);
-}
-
-/* ═══════════════════════════════════════════════════════
-   PACERUN v1.6.1 — Tela INICIAR AO VIVO + Deslizar para pausar
-   ═══════════════════════════════════════════════════════ */
-
-/* ── TELA IDLE (antes de iniciar) ────────────────────────── */
-.activity-idle-screen {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  background: var(--bg-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.activity-idle-screen.hidden {
-  display: none;
-}
-
-.activity-running-screen {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.activity-running-screen.hidden {
-  display: none;
-}
-
-.idle-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 32px 24px;
-  text-align: center;
-}
-
-.idle-icon {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background: rgba(26, 107, 240, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.idle-title {
-  font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 800;
-}
-
-.idle-subtitle {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-top: -8px;
-}
-
-.btn-iniciar-ao-vivo {
-  margin-top: 16px;
-  padding: 20px 48px;
-  background: var(--blue-500);
-  border: none;
-  border-radius: 60px;
-  color: white;
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  cursor: pointer;
-  box-shadow: 0 8px 32px rgba(26, 107, 240, 0.4);
-  transition: var(--transition);
-}
-
-.btn-iniciar-ao-vivo:active {
-  transform: scale(0.96);
-}
-
-/* ── DESLIZE PARA PAUSAR ─────────────────────────────────── */
-.slide-to-pause-wrap {
-  padding: 12px 16px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  background: var(--bg-primary);
-  flex-shrink: 0;
-}
-
-.slide-to-pause {
-  position: relative;
-  height: 56px;
-  background: var(--surface2);
-  border-radius: 28px;
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-
-.slide-thumb {
-  position: relative;
-  z-index: 2;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--amber);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  cursor: grab;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  transition: transform 0.15s ease;
-  touch-action: none;
-}
-
-.slide-thumb:active {
-  cursor: grabbing;
-}
-
-.slide-label {
-  position: absolute;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  pointer-events: none;
-  letter-spacing: 0.5px;
-}
-
-/* ── NAV HAMBURGUER NA BOTTOM-NAV ────────────────────────── */
-.bottom-nav .nav-item#btn-hamburger {
-  color: var(--text-secondary);
-}
-
-.bottom-nav .nav-item#btn-hamburger:hover,
-.bottom-nav .nav-item#btn-hamburger:focus {
-  color: var(--blue-300);
 }
 
 /* ── BOTÃO EXCLUIR ATIVIDADE — cole no final do css/app.css ── */
