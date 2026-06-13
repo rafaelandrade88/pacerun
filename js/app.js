@@ -399,6 +399,7 @@ function setupApp() {
   setupRaces();
   window.RACES_DATABASE = RACES_DATABASE;
   navigateTo('activity');
+  showIdleScreen();
   loadFeed();
   loadRanking('distance');
   loadProfileData();
@@ -469,6 +470,7 @@ function navigateTo(page) {
   if (page === 'progress') loadProgress();
   if (page === 'ranking') loadRanking(document.querySelector('.ranking-tab.active')?.dataset.rank || 'distance');
   if (page === 'community') loadCommunity();
+  if (page === 'activity' && !State.activity.running) showIdleScreen();
   if (page === 'feed') refreshFeedIfNeeded();
   if (page === 'profile') loadProfileData();
 }
@@ -477,161 +479,223 @@ function navigateTo(page) {
 // ACTIVITY TRACKING
 // ════════════════════════════════════════════════════════
 function setupActivityPage() {
-  // Start/Pause e Stop (nos controles fixos)
-  document.getElementById('btn-start-stop').addEventListener('click', handleStartStop);
-  document.getElementById('btn-stop').addEventListener('click', handleStop);
-  // Botões na tela de pausado: CONCLUIR e RETOMAR
+  // C1: Botão INICIAR AO VIVO
+  document.getElementById('btn-iniciar-ao-vivo')?.addEventListener('click', startActivity);
+
+  // Botões da tela pausada
   document.getElementById('btn-concluir')?.addEventListener('click', handleStop);
   document.getElementById('btn-resume-paused')?.addEventListener('click', resumeActivity);
 
-  // Photo button
-  document.getElementById('btn-photo-activity').addEventListener('click', () => {
+  // Foto durante a atividade
+  document.getElementById('btn-photo-activity')?.addEventListener('click', () => {
     document.getElementById('activity-photo-input')?.click();
   });
 
-  // Activity photo (inline)
   const actPhotoInput = document.createElement('input');
   actPhotoInput.type = 'file';
   actPhotoInput.accept = 'image/*';
   actPhotoInput.id = 'activity-photo-input';
-  actPhotoInput.className = 'hidden';
+  actPhotoInput.style.display = 'none';
   document.body.appendChild(actPhotoInput);
-  actPhotoInput.addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (file) readFileAsDataURL(file).then(url => { State.activity.photo = url; showToast('Foto adicionada!'); });
-  });
-
-  // Modal buttons
-  document.getElementById('btn-add-photo').addEventListener('click', () => {
-    document.getElementById('activity-photo-input').click();
-  });
-  document.getElementById('activity-photo-input')?.addEventListener('change', e => {
+  actPhotoInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    readFileAsDataURL(file).then(url => {
+    showToast('Enviando foto...');
+    const url = await uploadToCloudinary(file);
+    if (url) {
       State.activity.photo = url;
-      const preview = document.getElementById('summary-photo-preview');
-      preview.src = url;
-      preview.classList.remove('hidden');
-    });
+      showToast('Foto adicionada! ✅');
+    }
+    actPhotoInput.value = '';
   });
 
-  document.getElementById('btn-save-activity').addEventListener('click', saveActivity);
-  document.getElementById('btn-discard-activity').addEventListener('click', () => {
+  // Configura gesto deslizar para pausar
+  setupSlideToAuse();
+
+  // Modal resumo
+  document.getElementById('btn-save-activity')?.addEventListener('click', saveActivity);
+  document.getElementById('btn-discard-activity')?.addEventListener('click', () => {
+    localStorage.removeItem('pacerun_active_run');
     document.getElementById('modal-summary').classList.add('hidden');
-    resetActivity();
+    showIdleScreen();
   });
-  document.getElementById('btn-share-activity').addEventListener('click', () => {
-    document.getElementById('modal-summary').classList.add('hidden');
+  document.getElementById('btn-add-photo')?.addEventListener('click', () => {
+    document.getElementById('summary-photo-input')?.click();
+  });
+  const summaryPhotoInput = document.createElement('input');
+  summaryPhotoInput.type = 'file';
+  summaryPhotoInput.accept = 'image/*';
+  summaryPhotoInput.id = 'summary-photo-input';
+  summaryPhotoInput.style.display = 'none';
+  document.body.appendChild(summaryPhotoInput);
+  summaryPhotoInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file || !State.currentActivity) return;
+    showToast('Enviando foto...');
+    const url = await uploadToCloudinary(file);
+    if (url) {
+      State.currentActivity.photo = url;
+      const prev = document.getElementById('summary-photo-preview');
+      if (prev) { prev.src = url; prev.classList.remove('hidden'); }
+      showToast('Foto adicionada! ✅');
+    }
+    summaryPhotoInput.value = '';
+  });
+
+  // Compartilhamento
+  document.getElementById('share-whatsapp')?.addEventListener('click', () => shareWhatsApp());
+  document.getElementById('share-instagram')?.addEventListener('click', () => shareInstagramStories());
+  document.getElementById('share-facebook')?.addEventListener('click', () => shareFacebook());
+  document.getElementById('share-native')?.addEventListener('click', () => shareNative());
+  document.getElementById('btn-close-share')?.addEventListener('click', () => {
+    document.getElementById('modal-share').classList.add('hidden');
+  });
+  document.getElementById('btn-share-activity')?.addEventListener('click', () => {
     openShareModal(State.currentActivity);
   });
-
-  // Share modal
-  setupShareModal();
 }
 
-function handleStartStop() {
-  if (!State.activity.running) {
-    startActivity();
-  } else if (!State.activity.paused) {
-    pauseActivity();
-  } else {
-    resumeActivity();
+// ── Gesto deslizar para pausar ────────────────────────────
+function setupSlideToAuse() {
+  const wrap  = document.getElementById('slide-to-pause');
+  const thumb = document.getElementById('slide-thumb');
+  if (!wrap || !thumb) return;
+
+  let startX = 0, isDragging = false;
+  const THRESHOLD = 0.55; // 55% da largura para acionar pausa
+
+  function onStart(e) {
+    if (!State.activity.running || State.activity.paused) return;
+    isDragging = true;
+    startX = (e.touches ? e.touches[0].clientX : e.clientX);
+    thumb.style.transition = 'none';
   }
+
+  function onMove(e) {
+    if (!isDragging) return;
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - startX;
+    const max = wrap.offsetWidth - thumb.offsetWidth - 8;
+    const clamped = Math.max(0, Math.min(x, max));
+    thumb.style.transform = `translateX(${clamped}px)`;
+    // Diminui opacidade do label conforme desliza
+    const label = wrap.querySelector('.slide-label');
+    if (label) label.style.opacity = 1 - (clamped / max);
+  }
+
+  function onEnd(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    thumb.style.transition = '';
+    const x = (e.changedTouches ? e.changedTouches[0].clientX : e.clientX) - startX;
+    const max = wrap.offsetWidth - thumb.offsetWidth - 8;
+    if (x / wrap.offsetWidth >= THRESHOLD) {
+      // Aciona pausa
+      thumb.style.transform = `translateX(${max}px)`;
+      setTimeout(() => pauseActivity(), 150);
+    } else {
+      // Volta ao início
+      thumb.style.transform = 'translateX(0)';
+      const label = wrap.querySelector('.slide-label');
+      if (label) label.style.opacity = 1;
+    }
+  }
+
+  thumb.addEventListener('touchstart', onStart, { passive: true });
+  thumb.addEventListener('touchmove', onMove, { passive: true });
+  thumb.addEventListener('touchend', onEnd, { passive: true });
+  // Mouse (desktop/teste)
+  thumb.addEventListener('mousedown', onStart);
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onEnd);
+}
+
+// ── Controle de telas de atividade ───────────────────────
+function showIdleScreen() {
+  document.getElementById('activity-idle-screen')?.classList.remove('hidden');
+  document.getElementById('activity-running-screen')?.classList.add('hidden');
+  document.getElementById('activity-paused-screen')?.classList.add('hidden');
+  document.getElementById('activity-controls-fixed')?.classList.remove('visible');
+}
+
+function showRunningScreen() {
+  document.getElementById('activity-idle-screen')?.classList.add('hidden');
+  document.getElementById('activity-running-screen')?.classList.remove('hidden');
+  document.getElementById('activity-paused-screen')?.classList.add('hidden');
+  document.getElementById('activity-controls-fixed')?.classList.add('visible');
+  // Reseta o slider
+  const thumb = document.getElementById('slide-thumb');
+  if (thumb) {
+    thumb.style.transition = '';
+    thumb.style.transform = 'translateX(0)';
+    const label = document.querySelector('.slide-label');
+    if (label) label.style.opacity = 1;
+  }
+}
+
+function showPausedScreen() {
+  document.getElementById('activity-idle-screen')?.classList.add('hidden');
+  document.getElementById('activity-running-screen')?.classList.add('hidden');
+  document.getElementById('activity-paused-screen')?.classList.remove('hidden');
+  document.getElementById('activity-controls-fixed')?.classList.remove('visible');
+
+  const dist    = State.activity.distance;
+  const elapsed = computeElapsed();
+  const avgSpeed = dist > 0 && elapsed > 0 ? dist / (elapsed / 3600) : 0;
+  const pace = avgSpeed > 0 ? 60 / avgSpeed : 0;
+  const paceStr = dist >= 0.05 && pace >= 1 && pace <= 30
+    ? `${Math.floor(pace)}:${String(Math.round((pace - Math.floor(pace)) * 60)).padStart(2,'0')}`
+    : '--:--';
+
+  document.getElementById('paused-duration').textContent  = formatDuration(elapsed);
+  document.getElementById('paused-distance').textContent  = dist.toFixed(2);
+  document.getElementById('paused-calories').textContent  = Math.round(calcCalories(dist, elapsed));
+  document.getElementById('paused-pace').textContent      = paceStr;
 }
 
 function startActivity() {
   if (!navigator.geolocation) { showToast('GPS não disponível neste dispositivo.'); return; }
 
-  State.activity.running = true;
-  State.activity.paused = false;
-  State.activity.startTime = Date.now();
+  State.activity.running    = true;
+  State.activity.paused     = false;
+  State.activity.startTime  = Date.now();
   State.activity.pausedTime = 0;
-  State.activity.positions = [];
-  State.activity.distance = 0;
-  State.activity.speeds = [];
+  State.activity.positions  = [];
+  State.activity.distance   = 0;
+  State.activity.speeds     = [];
   State.activity.recentSpeeds = [];
-  State.activity.maxSpeed = 0;
-  State.activity.kmSplits = [];
-  State.activity.photo = null;
+  State.activity.maxSpeed   = 0;
+  State.activity.kmSplits   = [];
+  State.activity.photo      = null;
 
-  // Mostra tela de corrida ativa
-  showActivityRunning();
+  showRunningScreen();
   initMap();
-  document.getElementById('map-idle')?.classList.add('hidden');
-  document.querySelector('.gps-dot')?.classList.add('active');
 
   State.activity.intervalId = setInterval(() => {
-    updateActivityUI();
-    persistActivityState();
+    if (!State.activity.paused) {
+      updateActivityUI();
+      persistActivityState();
+    }
   }, 1000);
 
   State.activity.watchId = navigator.geolocation.watchPosition(
     onPositionUpdate,
-    err => console.warn('GPS error:', err),
-    { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+    err => console.warn('GPS error:', err.code, err.message),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
   );
 }
 
-function showActivityRunning() {
-  // Esconde tela pausada, mostra mapa e controles de corrida
-  document.getElementById('activity-paused-screen')?.classList.add('hidden');
-  document.getElementById('activity-map')?.classList.remove('hidden');
-  document.getElementById('activity-controls-fixed')?.classList.add('visible');
-
-  const btnStart = document.getElementById('btn-start-stop');
-  if (btnStart) {
-    document.getElementById('icon-start')?.classList.add('hidden');
-    document.getElementById('icon-pause')?.classList.remove('hidden');
-    document.getElementById('icon-resume')?.classList.add('hidden');
-    btnStart.classList.add('running');
-  }
-  document.getElementById('btn-stop').disabled = false;
-}
-
 function pauseActivity() {
-  State.activity.paused = true;
+  if (!State.activity.running || State.activity.paused) return;
+  State.activity.paused     = true;
   State.activity.pauseStart = Date.now();
-  clearInterval(State.activity.intervalId);
-  State.activity.intervalId = null;
-
-  // Mostra a tela de pausado (estilo Adidas)
-  showActivityPaused();
-}
-
-function showActivityPaused() {
-  // Esconde controles normais
-  document.getElementById('activity-controls-fixed')?.classList.remove('visible');
-
-  // Atualiza a tela de pausado com os dados atuais
-  const dist = State.activity.distance;
-  const elapsed = computeElapsed();
-  const avgSpeed = dist > 0 && elapsed > 0 ? dist / (elapsed / 3600) : 0;
-  const pace = avgSpeed > 0 ? 60 / avgSpeed : 0;
-  const paceMin = Math.floor(pace);
-  const paceSec = Math.round((pace - paceMin) * 60);
-  const paceStr = dist >= 0.05 && pace >= 1 && pace <= 30
-    ? `${paceMin}:${String(paceSec).padStart(2, '0')}` : '--:--';
-
-  const el = document.getElementById('activity-paused-screen');
-  if (el) {
-    el.querySelector('#paused-duration').textContent = formatDuration(elapsed);
-    el.querySelector('#paused-distance').textContent = dist.toFixed(2);
-    el.querySelector('#paused-calories').textContent = Math.round(calcCalories(dist, elapsed));
-    el.querySelector('#paused-pace').textContent = paceStr;
-    el.classList.remove('hidden');
-  }
+  showPausedScreen();
 }
 
 function resumeActivity() {
-  State.activity.paused = false;
+  if (!State.activity.running || !State.activity.paused) return;
+  State.activity.paused      = false;
   State.activity.pausedTime += Date.now() - State.activity.pauseStart;
-
-  showActivityRunning();
-  State.activity.intervalId = setInterval(() => {
-    updateActivityUI();
-    persistActivityState();
-  }, 1000);
+  showRunningScreen();
 }
 
 function handleStop() {
@@ -640,51 +704,34 @@ function handleStop() {
   clearInterval(State.activity.intervalId);
   navigator.geolocation.clearWatch(State.activity.watchId);
   State.activity.running = false;
-  State.activity.paused = false;
+  State.activity.paused  = false;
   localStorage.removeItem('pacerun_active_run');
 
-  // Reseta UI
-  document.getElementById('activity-paused-screen')?.classList.add('hidden');
-  document.getElementById('activity-controls-fixed')?.classList.add('visible');
-  document.getElementById('icon-start')?.classList.remove('hidden');
-  document.getElementById('icon-pause')?.classList.add('hidden');
-  document.getElementById('icon-resume')?.classList.add('hidden');
-  document.getElementById('btn-start-stop')?.classList.remove('running');
-  document.getElementById('btn-stop').disabled = true;
-  document.querySelector('.gps-dot')?.classList.remove('active');
-
-  // Calcula dados finais com limites plausíveis
   const duration = computeElapsed();
-  const dist = State.activity.distance;
-  const avgSpeed = dist > 0 && duration > 0 ? dist / (duration / 3600) : 0;
-  const calories = calcCalories(dist, duration);
+  const dist     = State.activity.distance;
+  const speeds   = State.activity.speeds;
+  const avgSpd   = speeds.length > 0 ? speeds.reduce((a,b)=>a+b,0)/speeds.length : 0;
 
-  // Pace com validação
-  const MIN_DIST = 0.05;
   let paceStr = '--:--';
-  if (dist >= MIN_DIST && avgSpeed > 0) {
-    const pace = 60 / avgSpeed;
-    if (pace >= 1 && pace <= 30) {
-      paceStr = `${Math.floor(pace)}:${String(Math.round((pace - Math.floor(pace)) * 60)).padStart(2, '0')}`;
+  if (dist >= 0.05 && avgSpd > 0) {
+    const pace = 60 / avgSpd;
+    if (pace >= 1 && pace <= 60) {
+      paceStr = `${Math.floor(pace)}:${String(Math.round((pace-Math.floor(pace))*60)).padStart(2,'0')}`;
     }
   }
 
-  // Velocidade média histórica
-  const speeds = State.activity.speeds;
-  const avgSpd = speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
-
   State.currentActivity = {
-    type: State.activity.type || 'running',
-    distance: dist,
+    type:      State.activity.type || 'running',
+    distance:  dist,
     duration,
-    avgSpeed: avgSpd,
-    maxSpeed: State.activity.maxSpeed,
-    pace: paceStr,
-    calories,
-    weight: State.userProfile?.weight || 70,
-    photo: State.activity.photo,
+    avgSpeed:  avgSpd,
+    maxSpeed:  State.activity.maxSpeed,
+    pace:      paceStr,
+    calories:  calcCalories(dist, duration),
+    weight:    State.userProfile?.weight || 70,
+    photo:     State.activity.photo,
     positions: State.activity.positions,
-    kmSplits: State.activity.kmSplits || [],
+    kmSplits:  State.activity.kmSplits || [],
     timestamp: Date.now(),
   };
 
@@ -700,13 +747,13 @@ function onPositionUpdate(pos) {
     const last = positions[positions.length - 1];
     const d = haversine(last.lat, last.lng, latitude, longitude);
 
-    // FIX: accuracy < 200 (era 50 — muito restrito, causava perda de 90% dos pontos)
-    // Filtro adicional: descarta saltos impossíveis (> 300m entre leituras)
+    // C4 FIX GPS: remove filtro accuracy (muito restritivo indoor/outdoor)
+    // Só descarta saltos impossíveis (teleporte GPS > 500m) e pontos estacionários < 1m
     const timeDiff = (Date.now() - (last.ts || Date.now())) / 1000 || 1;
     const speedMs = (d * 1000) / timeDiff;
-    const plausible = speedMs < 15; // máx 54 km/h — impossível a pé
+    const plausible = speedMs < 20; // máx 72 km/h — descarta teleportes de GPS
 
-    if (d > 0.003 && accuracy < 200 && plausible) {
+    if (d > 0.001 && plausible) { // mínimo 1 metro, sem filtro de accuracy
       const prevDist = State.activity.distance;
       State.activity.distance += d;
 
@@ -841,11 +888,17 @@ async function saveActivity() {
   try {
     const act = State.currentActivity;
 
-    // Upload de foto se houver (Cloudinary)
+    // Upload de foto se houver
     let photoURL = '';
-    if (act.photo && act.photo.startsWith('data:')) {
-      const uploaded = await uploadActivityPhoto(act.photo, `act_${Date.now()}`);
-      photoURL = uploaded || '';
+    if (act.photo) {
+      if (act.photo.startsWith('https://') || act.photo.startsWith('http://')) {
+        // Já é URL do Cloudinary — usa diretamente
+        photoURL = act.photo;
+      } else if (act.photo.startsWith('data:')) {
+        // Base64 — faz upload para Cloudinary
+        const uploaded = await uploadActivityPhoto(act.photo, `act_${Date.now()}`);
+        photoURL = uploaded || '';
+      }
     }
 
     // Dados da atividade
@@ -2157,34 +2210,30 @@ function buildShareText() {
   return `🏃 Acabei de completar ${(a.distance || 0).toFixed(2)} km em ${formatDuration(a.duration || 0)}!\n${paceInfo}🔥 ${Math.round(a.calories || 0)} kcal\n\nvia PaceRun`;
 }
 
-async function buildShareFiles() {
-  // Tenta compartilhar a foto junto com o texto se disponível
-  const a = State.currentActivity;
-  if (!a?.photoURL) return null;
-  try {
-    const resp = await fetch(a.photoURL);
-    const blob = await resp.blob();
-    const file = new File([blob], 'pacerun-corrida.jpg', { type: 'image/jpeg' });
-    return [file];
-  } catch { return null; }
-}
-
 function shareWhatsApp() {
-  const text = encodeURIComponent(buildShareText());
-  window.open(`https://wa.me/?text=${text}`, '_blank');
+  const a = State.currentActivity;
+  const text = buildShareText();
+  // Se tem foto, inclui o link da foto no texto do WhatsApp
+  const photoLine = a?.photo ? `\n🖼️ Foto: ${a.photo}` : '';
+  window.open(`https://wa.me/?text=${encodeURIComponent(text + photoLine)}`, '_blank');
 }
 
 async function shareInstagramStories() {
-  // Instagram: tenta Web Share API com arquivo de imagem
-  const files = await buildShareFiles();
-  if (navigator.canShare && files && navigator.canShare({ files })) {
-    navigator.share({ files, title: 'Minha corrida no PaceRun', text: buildShareText() })
-      .catch(() => fallbackShare('Instagram'));
+  // Instagram não aceita Web Share API com arquivos cross-origin (Cloudinary)
+  // Estratégia: abre a foto em nova aba + copia o texto para colar nos Stories
+  const a = State.currentActivity;
+  const text = buildShareText();
+  copyToClipboard(text);
+
+  if (a?.photo) {
+    // Abre a foto do Cloudinary em nova aba para o usuário salvar e postar
+    window.open(a.photo, '_blank');
+    showToast('Foto aberta! Texto copiado. Salve a foto e cole no Stories 📸', 5000);
   } else if (navigator.share) {
-    navigator.share({ title: 'Minha corrida no PaceRun', text: buildShareText() })
-      .catch(() => fallbackShare('Instagram'));
+    navigator.share({ title: 'Minha corrida no PaceRun', text })
+      .catch(() => showToast('Texto copiado! Cole no Instagram 📋', 4000));
   } else {
-    fallbackShare('Instagram');
+    showToast('Texto copiado! Abra o Instagram e cole nos Stories 📋', 4000);
   }
 }
 
@@ -2194,35 +2243,43 @@ function fallbackShare(platform) {
 }
 
 function shareFacebook() {
+  const a = State.currentActivity;
+  const text = buildShareText();
   if (navigator.share) {
-    navigator.share({ title: 'Minha corrida no PaceRun', text: buildShareText() })
-      .catch(() => fallbackShare('Facebook'));
+    navigator.share({ title: 'Minha corrida no PaceRun', text })
+      .catch(() => { copyToClipboard(text); showToast('Texto copiado!'); });
   } else {
-    fallbackShare('Facebook');
+    copyToClipboard(text);
+    showToast('Texto copiado! Abra o Facebook e cole 📋', 4000);
   }
 }
 
 async function shareNative() {
-  const files = await buildShareFiles();
-  const shareData = {
-    title: 'Minha atividade no PaceRun',
-    text: buildShareText(),
-    ...(files && navigator.canShare?.({ files }) ? { files } : {}),
-  };
+  const a = State.currentActivity;
+  const text = buildShareText();
+  // Tenta compartilhar com a foto via URL (sem fetch cross-origin)
+  const shareData = { title: 'Minha atividade no PaceRun', text };
   if (navigator.share) {
     navigator.share(shareData).catch(() => {
-      copyToClipboard(buildShareText());
+      copyToClipboard(text);
       showToast('Texto copiado!');
     });
   } else {
-    copyToClipboard(buildShareText());
+    copyToClipboard(text);
     showToast('Texto copiado para a área de transferência!');
   }
 }
 
 function copyToClipboard(text) {
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).catch(() => { });
+    navigator.clipboard.writeText(text).catch(() => {});
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
   }
 }
 

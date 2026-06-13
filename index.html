@@ -187,14 +187,6 @@
           </svg>
           <span class="notif-badge hidden" id="notif-badge">0</span>
         </button>
-        <button class="icon-btn" id="btn-hamburger" aria-label="Menu">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
       </div>
     </header>
 
@@ -203,52 +195,74 @@
 
       <!-- ── PAGE: ATIVIDADE ── -->
       <section id="page-activity" class="page active">
-        <!-- Stats no topo — só 4 métricas -->
-        <div class="activity-stats-grid">
-          <div class="stat-card main-stat">
-            <span class="stat-value" id="act-distance">0.00</span>
-            <span class="stat-unit">km</span>
-            <span class="stat-label">distância</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-value" id="act-duration">00:00</span>
-            <span class="stat-label">duração</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-value" id="act-pace">--:--</span>
-            <span class="stat-label">ritmo /km</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-value" id="act-calories">0</span>
-            <span class="stat-label">kcal</span>
-          </div>
-        </div>
 
-        <!-- Mapa ocupa o restante -->
-        <div class="activity-map" id="activity-map">
-          <div class="map-overlay" id="map-idle">
-            <div class="map-idle-icon">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1A6BF0" stroke-width="1.5"
+        <!-- ── TELA IDLE: antes de iniciar ── -->
+        <div id="activity-idle-screen" class="activity-idle-screen">
+          <div class="idle-content">
+            <div class="idle-icon">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#1A6BF0" stroke-width="1.5"
                 stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v4l3 3" />
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
               </svg>
             </div>
-            <p>Pressione Iniciar para começar</p>
-          </div>
-          <div id="map-container" style="width:100%;height:100%;overflow:hidden;"></div>
-          <div class="gps-indicator" id="gps-indicator">
-            <span class="gps-dot"></span> GPS
-          </div>
-          <!-- Velocidades sobrepostas no mapa -->
-          <div class="speed-overlay">
-            <div class="speed-item-sm"><span id="act-speed">0.0</span><label>km/h</label></div>
-            <div class="speed-item-sm"><span id="act-avg-speed">0.0</span><label>média</label></div>
-            <div class="speed-item-sm"><span id="act-max-speed">0.0</span><label>máx</label></div>
+            <h2 class="idle-title">Pronto para correr?</h2>
+            <p class="idle-subtitle">GPS será ativado ao iniciar</p>
+            <button class="btn-iniciar-ao-vivo" id="btn-iniciar-ao-vivo">
+              INICIAR AO VIVO
+            </button>
           </div>
         </div>
 
-        <!-- TELA DE PAUSADO — estilo Adidas (oculta por padrão) -->
+        <!-- ── TELA RUNNING: durante a corrida ── -->
+        <div id="activity-running-screen" class="activity-running-screen hidden">
+          <!-- Stats no topo -->
+          <div class="activity-stats-grid">
+            <div class="stat-card main-stat">
+              <span class="stat-value" id="act-distance">0.00</span>
+              <span class="stat-unit">km</span>
+              <span class="stat-label">distância</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="act-duration">00:00</span>
+              <span class="stat-label">duração</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="act-pace">--:--</span>
+              <span class="stat-label">ritmo /km</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="act-calories">0</span>
+              <span class="stat-label">kcal</span>
+            </div>
+          </div>
+          <!-- Mapa -->
+          <div class="activity-map" id="activity-map">
+            <div id="map-container" style="width:100%;height:100%;overflow:hidden;"></div>
+            <div class="gps-indicator" id="gps-indicator">
+              <span class="gps-dot active"></span> GPS
+            </div>
+            <div class="speed-overlay">
+              <div class="speed-item-sm"><span id="act-speed">0.0</span><label>km/h</label></div>
+              <div class="speed-item-sm"><span id="act-avg-speed">0.0</span><label>média</label></div>
+              <div class="speed-item-sm"><span id="act-max-speed">0.0</span><label>máx</label></div>
+            </div>
+          </div>
+          <!-- Botão deslize para pausar -->
+          <div class="slide-to-pause-wrap">
+            <div class="slide-to-pause" id="slide-to-pause">
+              <div class="slide-thumb" id="slide-thumb">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16"/>
+                  <rect x="14" y="4" width="4" height="16"/>
+                </svg>
+              </div>
+              <span class="slide-label">deslize para pausar</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TELA PAUSADA: botões CONCLUIR e RETOMAR ── -->
         <div id="activity-paused-screen" class="activity-paused-screen hidden">
           <div class="paused-header">PAUSADO</div>
           <div class="paused-duration" id="paused-duration">00:00</div>
@@ -267,14 +281,13 @@
               <div class="paused-metric-lbl">Ritmo médio (min/km)</div>
             </div>
           </div>
-          <!-- Mapa na tela pausada -->
           <div class="paused-map-area" id="paused-map-area"></div>
-          <!-- Botões CONCLUIR e RETOMAR -->
           <div class="paused-actions">
             <button class="paused-btn paused-btn-stop" id="btn-concluir">CONCLUIR</button>
             <button class="paused-btn paused-btn-resume" id="btn-resume-paused">RETOMAR</button>
           </div>
         </div>
+
       </section>
 
       <!-- ── PAGE: FEED ── -->
@@ -447,33 +460,25 @@
         </svg>
         <span>Progresso</span>
       </button>
+      <button class="nav-item" id="btn-hamburger" onclick="window.openDrawer()" aria-label="Menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+        <span>Menu</span>
+      </button>
     </nav>
   </div>
 
-  <!-- CONTROLES FIXOS DE ATIVIDADE -->
-  <div class="activity-controls-fixed visible" id="activity-controls-fixed">
-    <button class="ctrl-btn secondary" id="btn-photo-activity" title="Foto">
+  <!-- CONTROLES FIXOS DE ATIVIDADE (foto durante corrida) -->
+  <div class="activity-controls-fixed" id="activity-controls-fixed">
+    <button class="ctrl-btn secondary" id="btn-photo-activity" title="Adicionar foto">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
         <circle cx="12" cy="13" r="4" />
-      </svg>
-    </button>
-    <button class="ctrl-btn primary" id="btn-start-stop">
-      <svg id="icon-start" width="30" height="30" viewBox="0 0 24 24" fill="currentColor">
-        <polygon points="5 3 19 12 5 21 5 3" />
-      </svg>
-      <svg id="icon-pause" width="30" height="30" viewBox="0 0 24 24" fill="currentColor" class="hidden">
-        <rect x="6" y="4" width="4" height="16" />
-        <rect x="14" y="4" width="4" height="16" />
-      </svg>
-      <svg id="icon-resume" width="30" height="30" viewBox="0 0 24 24" fill="currentColor" class="hidden">
-        <polygon points="5 3 19 12 5 21 5 3" />
-      </svg>
-    </button>
-    <button class="ctrl-btn secondary" id="btn-stop" disabled title="Encerrar">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
       </svg>
     </button>
   </div>
