@@ -390,6 +390,119 @@ function authErrorMsg(code) {
 }
 
 // ── App Setup ─────────────────────────────────────────────
+
+// ── Persistência de corrida (recuperação se app fechar) ──────────────────
+function persistActivityState() {
+  if (!State.activity.running) return;
+  try {
+    localStorage.setItem('pacerun_active_run', JSON.stringify({
+      running: true,
+      startTime: State.activity.startTime,
+      pausedTime: State.activity.pausedTime,
+      distance: State.activity.distance,
+      speeds: (State.activity.speeds || []).slice(-20),
+      maxSpeed: State.activity.maxSpeed,
+      type: State.activity.type,
+      positions: (State.activity.positions || []).slice(-100),
+      savedAt: Date.now(),
+    }));
+  } catch (e) { /* localStorage cheio */ }
+}
+
+function calcCaloriesStatic(distKm, durationSec, weight, type = 'running') {
+  const MET = type === 'running' ? 8.5 : 3.5;
+  return MET * weight * (durationSec / 3600);
+}
+
+function checkInterruptedActivity() {
+  try {
+    const raw = localStorage.getItem('pacerun_active_run');
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    const age = Date.now() - (saved.savedAt || 0);
+    if (!saved.running || age > 2 * 3600 * 1000) {
+      localStorage.removeItem('pacerun_active_run');
+      return;
+    }
+    showInterruptedActivityModal(saved);
+  } catch (e) {
+    localStorage.removeItem('pacerun_active_run');
+  }
+}
+
+function showInterruptedActivityModal(saved) {
+  const dist = (saved.distance || 0).toFixed(2);
+  const elapsed = Math.round((Date.now() - saved.startTime - saved.pausedTime) / 1000);
+  const dur = formatDuration(elapsed);
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'modal-interrupted';
+  modal.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:48px;margin-bottom:8px">⚠️</div>
+        <h2 style="font-family:var(--font-display);font-size:22px;font-weight:800">Corrida interrompida</h2>
+        <p style="color:var(--text-secondary);margin-top:8px;font-size:14px">
+          O app foi fechado durante uma atividade.<br>
+          <strong style="color:var(--white)">${dist} km · ${dur}</strong> registrados.
+        </p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn-primary" id="btn-recover-run">Salvar atividade registrada</button>
+        <button class="btn-ghost" style="color:#FF4D4D" id="btn-discard-interrupted">Descartar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('btn-recover-run').addEventListener('click', () => {
+    const duration = Math.round((saved.savedAt - saved.startTime - saved.pausedTime) / 1000);
+    const avgSpeed = saved.distance > 0 && duration > 0 ? saved.distance / (duration / 3600) : 0;
+    const pace = avgSpeed > 0 ? 60 / avgSpeed : 0;
+    const paceMin = Math.floor(pace);
+    const paceSec = Math.round((pace - paceMin) * 60);
+    State.currentActivity = {
+      type: saved.type || 'running',
+      distance: saved.distance || 0,
+      duration,
+      avgSpeed,
+      maxSpeed: saved.maxSpeed || 0,
+      pace: avgSpeed > 0 ? `${paceMin}:${String(paceSec).padStart(2,'0')}` : '--:--',
+      calories: calcCaloriesStatic(saved.distance || 0, duration, State.userProfile?.weight || 70),
+      photo: null,
+      positions: saved.positions || [],
+      timestamp: saved.startTime,
+    };
+    localStorage.removeItem('pacerun_active_run');
+    modal.remove();
+    showSummaryModal(State.currentActivity);
+  });
+  document.getElementById('btn-discard-interrupted').addEventListener('click', () => {
+    localStorage.removeItem('pacerun_active_run');
+    modal.remove();
+  });
+}
+
+// ── Upload de foto de atividade (para uso no setupActivityPage) ───────────
+async function uploadToCloudinary(file) {
+  const CLOUD_NAME = 'dzesgiw8e';
+  const UPLOAD_PRESET = 'pacerun_unsigned';
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append('public_id', `pacerun/activities/${State.user?.uid || 'anon'}/${Date.now()}`);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+      method: 'POST', body: formData,
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.secure_url;
+  } catch (e) {
+    console.error('uploadToCloudinary error:', e);
+    return null;
+  }
+}
+
 function setupApp() {
   setupNav();
   setupActivityPage();
@@ -399,7 +512,6 @@ function setupApp() {
   setupRaces();
   window.RACES_DATABASE = RACES_DATABASE;
   navigateTo('activity');
-  showIdleScreen();
   loadFeed();
   loadRanking('distance');
   loadProfileData();
@@ -470,7 +582,6 @@ function navigateTo(page) {
   if (page === 'progress') loadProgress();
   if (page === 'ranking') loadRanking(document.querySelector('.ranking-tab.active')?.dataset.rank || 'distance');
   if (page === 'community') loadCommunity();
-  if (page === 'activity' && !State.activity.running) showIdleScreen();
   if (page === 'feed') refreshFeedIfNeeded();
   if (page === 'profile') loadProfileData();
 }
@@ -482,7 +593,7 @@ function setupActivityPage() {
   // C1: Botão INICIAR AO VIVO
   document.getElementById('btn-iniciar-ao-vivo')?.addEventListener('click', startActivity);
 
-  // Botões da tela pausada
+  // Botões da tela pausada: CONCLUIR e RETOMAR
   document.getElementById('btn-concluir')?.addEventListener('click', handleStop);
   document.getElementById('btn-resume-paused')?.addEventListener('click', resumeActivity);
 
@@ -490,22 +601,15 @@ function setupActivityPage() {
   document.getElementById('btn-photo-activity')?.addEventListener('click', () => {
     document.getElementById('activity-photo-input')?.click();
   });
-
   const actPhotoInput = document.createElement('input');
-  actPhotoInput.type = 'file';
-  actPhotoInput.accept = 'image/*';
-  actPhotoInput.id = 'activity-photo-input';
-  actPhotoInput.style.display = 'none';
+  actPhotoInput.type = 'file'; actPhotoInput.accept = 'image/*';
+  actPhotoInput.id = 'activity-photo-input'; actPhotoInput.style.display = 'none';
   document.body.appendChild(actPhotoInput);
   actPhotoInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     showToast('Enviando foto...');
     const url = await uploadToCloudinary(file);
-    if (url) {
-      State.activity.photo = url;
-      showToast('Foto adicionada! ✅');
-    }
+    if (url) { State.activity.photo = url; showToast('Foto adicionada! ✅'); }
     actPhotoInput.value = '';
   });
 
@@ -517,16 +621,16 @@ function setupActivityPage() {
   document.getElementById('btn-discard-activity')?.addEventListener('click', () => {
     localStorage.removeItem('pacerun_active_run');
     document.getElementById('modal-summary').classList.add('hidden');
-    showIdleScreen();
+    resetActivity();
   });
+
+  // Foto no resumo
   document.getElementById('btn-add-photo')?.addEventListener('click', () => {
     document.getElementById('summary-photo-input')?.click();
   });
   const summaryPhotoInput = document.createElement('input');
-  summaryPhotoInput.type = 'file';
-  summaryPhotoInput.accept = 'image/*';
-  summaryPhotoInput.id = 'summary-photo-input';
-  summaryPhotoInput.style.display = 'none';
+  summaryPhotoInput.type = 'file'; summaryPhotoInput.accept = 'image/*';
+  summaryPhotoInput.id = 'summary-photo-input'; summaryPhotoInput.style.display = 'none';
   document.body.appendChild(summaryPhotoInput);
   summaryPhotoInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -555,33 +659,30 @@ function setupActivityPage() {
   });
 }
 
-// ── Gesto deslizar para pausar ────────────────────────────
+// ── Gesto deslizar para pausar ───────────────────────────
 function setupSlideToAuse() {
   const wrap  = document.getElementById('slide-to-pause');
   const thumb = document.getElementById('slide-thumb');
   if (!wrap || !thumb) return;
 
   let startX = 0, isDragging = false;
-  const THRESHOLD = 0.55; // 55% da largura para acionar pausa
+  const THRESHOLD = 0.55;
 
   function onStart(e) {
     if (!State.activity.running || State.activity.paused) return;
     isDragging = true;
-    startX = (e.touches ? e.touches[0].clientX : e.clientX);
+    startX = e.touches ? e.touches[0].clientX : e.clientX;
     thumb.style.transition = 'none';
   }
-
   function onMove(e) {
     if (!isDragging) return;
     const x = (e.touches ? e.touches[0].clientX : e.clientX) - startX;
     const max = wrap.offsetWidth - thumb.offsetWidth - 8;
     const clamped = Math.max(0, Math.min(x, max));
     thumb.style.transform = `translateX(${clamped}px)`;
-    // Diminui opacidade do label conforme desliza
     const label = wrap.querySelector('.slide-label');
     if (label) label.style.opacity = 1 - (clamped / max);
   }
-
   function onEnd(e) {
     if (!isDragging) return;
     isDragging = false;
@@ -589,27 +690,23 @@ function setupSlideToAuse() {
     const x = (e.changedTouches ? e.changedTouches[0].clientX : e.clientX) - startX;
     const max = wrap.offsetWidth - thumb.offsetWidth - 8;
     if (x / wrap.offsetWidth >= THRESHOLD) {
-      // Aciona pausa
       thumb.style.transform = `translateX(${max}px)`;
       setTimeout(() => pauseActivity(), 150);
     } else {
-      // Volta ao início
       thumb.style.transform = 'translateX(0)';
       const label = wrap.querySelector('.slide-label');
       if (label) label.style.opacity = 1;
     }
   }
-
   thumb.addEventListener('touchstart', onStart, { passive: true });
-  thumb.addEventListener('touchmove', onMove, { passive: true });
-  thumb.addEventListener('touchend', onEnd, { passive: true });
-  // Mouse (desktop/teste)
+  thumb.addEventListener('touchmove',  onMove,  { passive: true });
+  thumb.addEventListener('touchend',   onEnd,   { passive: true });
   thumb.addEventListener('mousedown', onStart);
   document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onEnd);
+  document.addEventListener('mouseup',   onEnd);
 }
 
-// ── Controle de telas de atividade ───────────────────────
+// ── Controle de telas ────────────────────────────────────
 function showIdleScreen() {
   document.getElementById('activity-idle-screen')?.classList.remove('hidden');
   document.getElementById('activity-running-screen')?.classList.add('hidden');
@@ -622,7 +719,6 @@ function showRunningScreen() {
   document.getElementById('activity-running-screen')?.classList.remove('hidden');
   document.getElementById('activity-paused-screen')?.classList.add('hidden');
   document.getElementById('activity-controls-fixed')?.classList.add('visible');
-  // Reseta o slider
   const thumb = document.getElementById('slide-thumb');
   if (thumb) {
     thumb.style.transition = '';
@@ -638,7 +734,7 @@ function showPausedScreen() {
   document.getElementById('activity-paused-screen')?.classList.remove('hidden');
   document.getElementById('activity-controls-fixed')?.classList.remove('visible');
 
-  const dist    = State.activity.distance;
+  const dist = State.activity.distance;
   const elapsed = computeElapsed();
   const avgSpeed = dist > 0 && elapsed > 0 ? dist / (elapsed / 3600) : 0;
   const pace = avgSpeed > 0 ? 60 / avgSpeed : 0;
@@ -646,26 +742,27 @@ function showPausedScreen() {
     ? `${Math.floor(pace)}:${String(Math.round((pace - Math.floor(pace)) * 60)).padStart(2,'0')}`
     : '--:--';
 
-  document.getElementById('paused-duration').textContent  = formatDuration(elapsed);
-  document.getElementById('paused-distance').textContent  = dist.toFixed(2);
-  document.getElementById('paused-calories').textContent  = Math.round(calcCalories(dist, elapsed));
-  document.getElementById('paused-pace').textContent      = paceStr;
+  const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  setTxt('paused-duration', formatDuration(elapsed));
+  setTxt('paused-distance', dist.toFixed(2));
+  setTxt('paused-calories', Math.round(calcCalories(dist, elapsed)));
+  setTxt('paused-pace', paceStr);
 }
 
 function startActivity() {
   if (!navigator.geolocation) { showToast('GPS não disponível neste dispositivo.'); return; }
 
-  State.activity.running    = true;
-  State.activity.paused     = false;
-  State.activity.startTime  = Date.now();
-  State.activity.pausedTime = 0;
-  State.activity.positions  = [];
-  State.activity.distance   = 0;
-  State.activity.speeds     = [];
+  State.activity.running     = true;
+  State.activity.paused      = false;
+  State.activity.startTime   = Date.now();
+  State.activity.pausedTime  = 0;
+  State.activity.positions   = [];
+  State.activity.distance    = 0;
+  State.activity.speeds      = [];
   State.activity.recentSpeeds = [];
-  State.activity.maxSpeed   = 0;
-  State.activity.kmSplits   = [];
-  State.activity.photo      = null;
+  State.activity.maxSpeed    = 0;
+  State.activity.kmSplits    = [];
+  State.activity.photo       = null;
 
   showRunningScreen();
   initMap();
@@ -709,7 +806,7 @@ function handleStop() {
 
   const duration = computeElapsed();
   const dist     = State.activity.distance;
-  const speeds   = State.activity.speeds;
+  const speeds   = State.activity.speeds || [];
   const avgSpd   = speeds.length > 0 ? speeds.reduce((a,b)=>a+b,0)/speeds.length : 0;
 
   let paceStr = '--:--';
@@ -747,13 +844,14 @@ function onPositionUpdate(pos) {
     const last = positions[positions.length - 1];
     const d = haversine(last.lat, last.lng, latitude, longitude);
 
-    // C4 FIX GPS: remove filtro accuracy (muito restritivo indoor/outdoor)
-    // Só descarta saltos impossíveis (teleporte GPS > 500m) e pontos estacionários < 1m
+    // FIX: accuracy < 200 (era 50 — muito restrito, causava perda de 90% dos pontos)
+    // Filtro adicional: descarta saltos impossíveis (> 300m entre leituras)
     const timeDiff = (Date.now() - (last.ts || Date.now())) / 1000 || 1;
     const speedMs = (d * 1000) / timeDiff;
-    const plausible = speedMs < 20; // máx 72 km/h — descarta teleportes de GPS
+    const plausible = speedMs < 15; // máx 54 km/h — impossível a pé
 
-    if (d > 0.001 && plausible) { // mínimo 1 metro, sem filtro de accuracy
+    // C4: Remove filtro accuracy — muito restritivo indoor. Só filtra teleportes impossíveis.
+    if (d > 0.001 && plausible) {
       const prevDist = State.activity.distance;
       State.activity.distance += d;
 
@@ -892,10 +990,8 @@ async function saveActivity() {
     let photoURL = '';
     if (act.photo) {
       if (act.photo.startsWith('https://') || act.photo.startsWith('http://')) {
-        // Já é URL do Cloudinary — usa diretamente
-        photoURL = act.photo;
+        photoURL = act.photo; // já é URL do Cloudinary
       } else if (act.photo.startsWith('data:')) {
-        // Base64 — faz upload para Cloudinary
         const uploaded = await uploadActivityPhoto(act.photo, `act_${Date.now()}`);
         photoURL = uploaded || '';
       }
@@ -1040,23 +1136,31 @@ function showSummaryModal(act) {
 }
 
 function resetActivity() {
+  // Para timer e GPS se ainda ativos
+  if (State.activity.intervalId) {
+    clearInterval(State.activity.intervalId);
+  }
+  if (State.activity.watchId != null) {
+    navigator.geolocation.clearWatch(State.activity.watchId);
+  }
+
   Object.assign(State.activity, {
     running: false, paused: false,
     startTime: null, pausedTime: 0, pauseStart: null,
     intervalId: null, watchId: null,
     positions: [], distance: 0, duration: 0,
-    speeds: [], maxSpeed: 0, photo: null,
+    speeds: [], recentSpeeds: [], maxSpeed: 0, photo: null, kmSplits: [],
   });
 
-  document.getElementById('act-distance').textContent = '0.00';
-  document.getElementById('act-duration').textContent = '00:00';
-  document.getElementById('act-pace').textContent = '--:--';
-  document.getElementById('act-calories').textContent = '0';
-  document.getElementById('act-speed').textContent = '0.0';
-  document.getElementById('act-max-speed').textContent = '0.0';
-  document.getElementById('act-avg-speed').textContent = '0.0';
-
-  document.getElementById('map-idle').classList.remove('hidden');
+  // Reseta métricas (com optional chaining — elementos podem não existir)
+  const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setTxt('act-distance', '0.00');
+  setTxt('act-duration', '00:00');
+  setTxt('act-pace', '--:--');
+  setTxt('act-calories', '0');
+  setTxt('act-speed', '0.0');
+  setTxt('act-max-speed', '0.0');
+  setTxt('act-avg-speed', '0.0');
 
   // Destroi mapa para resetar
   if (State.map) {
@@ -1065,6 +1169,9 @@ function resetActivity() {
     State.polyline = null;
     State.userMarker = null;
   }
+
+  // Volta para tela idle
+  if (typeof showIdleScreen === 'function') showIdleScreen();
 }
 
 // ════════════════════════════════════════════════════════
@@ -1124,7 +1231,7 @@ async function loadFeed() {
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 3000,
@@ -2210,30 +2317,34 @@ function buildShareText() {
   return `🏃 Acabei de completar ${(a.distance || 0).toFixed(2)} km em ${formatDuration(a.duration || 0)}!\n${paceInfo}🔥 ${Math.round(a.calories || 0)} kcal\n\nvia PaceRun`;
 }
 
-function shareWhatsApp() {
+async function buildShareFiles() {
+  // Tenta compartilhar a foto junto com o texto se disponível
   const a = State.currentActivity;
-  const text = buildShareText();
-  // Se tem foto, inclui o link da foto no texto do WhatsApp
-  const photoLine = a?.photo ? `\n🖼️ Foto: ${a.photo}` : '';
-  window.open(`https://wa.me/?text=${encodeURIComponent(text + photoLine)}`, '_blank');
+  if (!a?.photoURL) return null;
+  try {
+    const resp = await fetch(a.photoURL);
+    const blob = await resp.blob();
+    const file = new File([blob], 'pacerun-corrida.jpg', { type: 'image/jpeg' });
+    return [file];
+  } catch { return null; }
+}
+
+function shareWhatsApp() {
+  const text = encodeURIComponent(buildShareText());
+  window.open(`https://wa.me/?text=${text}`, '_blank');
 }
 
 async function shareInstagramStories() {
-  // Instagram não aceita Web Share API com arquivos cross-origin (Cloudinary)
-  // Estratégia: abre a foto em nova aba + copia o texto para colar nos Stories
-  const a = State.currentActivity;
-  const text = buildShareText();
-  copyToClipboard(text);
-
-  if (a?.photo) {
-    // Abre a foto do Cloudinary em nova aba para o usuário salvar e postar
-    window.open(a.photo, '_blank');
-    showToast('Foto aberta! Texto copiado. Salve a foto e cole no Stories 📸', 5000);
+  // Instagram: tenta Web Share API com arquivo de imagem
+  const files = await buildShareFiles();
+  if (navigator.canShare && files && navigator.canShare({ files })) {
+    navigator.share({ files, title: 'Minha corrida no PaceRun', text: buildShareText() })
+      .catch(() => fallbackShare('Instagram'));
   } else if (navigator.share) {
-    navigator.share({ title: 'Minha corrida no PaceRun', text })
-      .catch(() => showToast('Texto copiado! Cole no Instagram 📋', 4000));
+    navigator.share({ title: 'Minha corrida no PaceRun', text: buildShareText() })
+      .catch(() => fallbackShare('Instagram'));
   } else {
-    showToast('Texto copiado! Abra o Instagram e cole nos Stories 📋', 4000);
+    fallbackShare('Instagram');
   }
 }
 
@@ -2243,43 +2354,35 @@ function fallbackShare(platform) {
 }
 
 function shareFacebook() {
-  const a = State.currentActivity;
-  const text = buildShareText();
   if (navigator.share) {
-    navigator.share({ title: 'Minha corrida no PaceRun', text })
-      .catch(() => { copyToClipboard(text); showToast('Texto copiado!'); });
+    navigator.share({ title: 'Minha corrida no PaceRun', text: buildShareText() })
+      .catch(() => fallbackShare('Facebook'));
   } else {
-    copyToClipboard(text);
-    showToast('Texto copiado! Abra o Facebook e cole 📋', 4000);
+    fallbackShare('Facebook');
   }
 }
 
 async function shareNative() {
-  const a = State.currentActivity;
-  const text = buildShareText();
-  // Tenta compartilhar com a foto via URL (sem fetch cross-origin)
-  const shareData = { title: 'Minha atividade no PaceRun', text };
+  const files = await buildShareFiles();
+  const shareData = {
+    title: 'Minha atividade no PaceRun',
+    text: buildShareText(),
+    ...(files && navigator.canShare?.({ files }) ? { files } : {}),
+  };
   if (navigator.share) {
     navigator.share(shareData).catch(() => {
-      copyToClipboard(text);
+      copyToClipboard(buildShareText());
       showToast('Texto copiado!');
     });
   } else {
-    copyToClipboard(text);
+    copyToClipboard(buildShareText());
     showToast('Texto copiado para a área de transferência!');
   }
 }
 
 function copyToClipboard(text) {
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).catch(() => {});
-  } else {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
+    navigator.clipboard.writeText(text).catch(() => { });
   }
 }
 
@@ -2788,6 +2891,6 @@ function updateDrawerNotifBadge() {
 // ── PWA Service Worker Registration ───────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW:', e));
+    navigator.serviceWorker.register('/pacerun/sw.js').catch(e => console.warn('SW:', e));
   });
 }
