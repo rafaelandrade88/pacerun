@@ -466,7 +466,7 @@ function showInterruptedActivityModal(saved) {
       duration,
       avgSpeed,
       maxSpeed: saved.maxSpeed || 0,
-      pace: avgSpeed > 0 ? `${paceMin}:${String(paceSec).padStart(2,'0')}` : '--:--',
+      pace: avgSpeed > 0 ? `${paceMin}:${String(paceSec).padStart(2, '0')}` : '--:--',
       calories: calcCaloriesStatic(saved.distance || 0, duration, State.userProfile?.weight || 70),
       photo: null,
       positions: saved.positions || [],
@@ -661,7 +661,7 @@ function setupActivityPage() {
 
 // ── Gesto deslizar para pausar ───────────────────────────
 function setupSlideToAuse() {
-  const wrap  = document.getElementById('slide-to-pause');
+  const wrap = document.getElementById('slide-to-pause');
   const thumb = document.getElementById('slide-thumb');
   if (!wrap || !thumb) return;
 
@@ -699,11 +699,11 @@ function setupSlideToAuse() {
     }
   }
   thumb.addEventListener('touchstart', onStart, { passive: true });
-  thumb.addEventListener('touchmove',  onMove,  { passive: true });
-  thumb.addEventListener('touchend',   onEnd,   { passive: true });
+  thumb.addEventListener('touchmove', onMove, { passive: true });
+  thumb.addEventListener('touchend', onEnd, { passive: true });
   thumb.addEventListener('mousedown', onStart);
   document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup',   onEnd);
+  document.addEventListener('mouseup', onEnd);
 }
 
 // ── Controle de telas ────────────────────────────────────
@@ -739,10 +739,10 @@ function showPausedScreen() {
   const avgSpeed = dist > 0 && elapsed > 0 ? dist / (elapsed / 3600) : 0;
   const pace = avgSpeed > 0 ? 60 / avgSpeed : 0;
   const paceStr = dist >= 0.05 && pace >= 1 && pace <= 30
-    ? `${Math.floor(pace)}:${String(Math.round((pace - Math.floor(pace)) * 60)).padStart(2,'0')}`
+    ? `${Math.floor(pace)}:${String(Math.round((pace - Math.floor(pace)) * 60)).padStart(2, '0')}`
     : '--:--';
 
-  const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   setTxt('paused-duration', formatDuration(elapsed));
   setTxt('paused-distance', dist.toFixed(2));
   setTxt('paused-calories', Math.round(calcCalories(dist, elapsed)));
@@ -752,17 +752,17 @@ function showPausedScreen() {
 function startActivity() {
   if (!navigator.geolocation) { showToast('GPS não disponível neste dispositivo.'); return; }
 
-  State.activity.running     = true;
-  State.activity.paused      = false;
-  State.activity.startTime   = Date.now();
-  State.activity.pausedTime  = 0;
-  State.activity.positions   = [];
-  State.activity.distance    = 0;
-  State.activity.speeds      = [];
+  State.activity.running = true;
+  State.activity.paused = false;
+  State.activity.startTime = Date.now();
+  State.activity.pausedTime = 0;
+  State.activity.positions = [];
+  State.activity.distance = 0;
+  State.activity.speeds = [];
   State.activity.recentSpeeds = [];
-  State.activity.maxSpeed    = 0;
-  State.activity.kmSplits    = [];
-  State.activity.photo       = null;
+  State.activity.maxSpeed = 0;
+  State.activity.kmSplits = [];
+  State.activity.photo = null;
 
   showRunningScreen();
   initMap();
@@ -783,14 +783,14 @@ function startActivity() {
 
 function pauseActivity() {
   if (!State.activity.running || State.activity.paused) return;
-  State.activity.paused     = true;
+  State.activity.paused = true;
   State.activity.pauseStart = Date.now();
   showPausedScreen();
 }
 
 function resumeActivity() {
   if (!State.activity.running || !State.activity.paused) return;
-  State.activity.paused      = false;
+  State.activity.paused = false;
   State.activity.pausedTime += Date.now() - State.activity.pauseStart;
   showRunningScreen();
 }
@@ -801,34 +801,34 @@ function handleStop() {
   clearInterval(State.activity.intervalId);
   navigator.geolocation.clearWatch(State.activity.watchId);
   State.activity.running = false;
-  State.activity.paused  = false;
+  State.activity.paused = false;
   localStorage.removeItem('pacerun_active_run');
 
   const duration = computeElapsed();
-  const dist     = State.activity.distance;
-  const speeds   = State.activity.speeds || [];
-  const avgSpd   = speeds.length > 0 ? speeds.reduce((a,b)=>a+b,0)/speeds.length : 0;
+  const dist = State.activity.distance;
+  const speeds = State.activity.speeds || [];
+  const avgSpd = speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
 
   let paceStr = '--:--';
   if (dist >= 0.05 && avgSpd > 0) {
     const pace = 60 / avgSpd;
     if (pace >= 1 && pace <= 60) {
-      paceStr = `${Math.floor(pace)}:${String(Math.round((pace-Math.floor(pace))*60)).padStart(2,'0')}`;
+      paceStr = `${Math.floor(pace)}:${String(Math.round((pace - Math.floor(pace)) * 60)).padStart(2, '0')}`;
     }
   }
 
   State.currentActivity = {
-    type:      State.activity.type || 'running',
-    distance:  dist,
+    type: State.activity.type || 'running',
+    distance: dist,
     duration,
-    avgSpeed:  avgSpd,
-    maxSpeed:  State.activity.maxSpeed,
-    pace:      paceStr,
-    calories:  calcCalories(dist, duration),
-    weight:    State.userProfile?.weight || 70,
-    photo:     State.activity.photo,
+    avgSpeed: avgSpd,
+    maxSpeed: State.activity.maxSpeed,
+    pace: paceStr,
+    calories: calcCalories(dist, duration),
+    weight: State.userProfile?.weight || 70,
+    photo: State.activity.photo,
     positions: State.activity.positions,
-    kmSplits:  State.activity.kmSplits || [],
+    kmSplits: State.activity.kmSplits || [],
     timestamp: Date.now(),
   };
 
@@ -1880,6 +1880,95 @@ document.querySelectorAll('.ranking-tab').forEach(tab => {
 // ════════════════════════════════════════════════════════
 // PROGRESS
 // ════════════════════════════════════════════════════════
+// ── Excluir atividade ─────────────────────────────────────
+window.confirmDeleteActivity = function (id, dist) {
+  // Modal de confirmação simples
+  const existing = document.getElementById('modal-delete-confirm');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-delete-confirm';
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '400';
+  modal.innerHTML = `
+    <div class="modal-sheet" style="padding:24px">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:44px;margin-bottom:8px">🗑️</div>
+        <h2 style="font-family:var(--font-display);font-size:20px;font-weight:800">Excluir atividade?</h2>
+        <p style="color:var(--text-secondary);font-size:14px;margin-top:8px">
+          Corrida de <strong style="color:var(--white)">${dist} km</strong> será removida permanentemente
+          do seu progresso e da comunidade.
+        </p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button id="btn-confirm-delete" style="
+          background:#E53935;border:none;border-radius:12px;
+          padding:16px;color:white;font-family:var(--font-display);
+          font-size:16px;font-weight:700;cursor:pointer;
+        ">Sim, excluir</button>
+        <button id="btn-cancel-delete" style="
+          background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+          padding:14px;color:var(--text-primary);font-family:var(--font-body);
+          font-size:15px;cursor:pointer;
+        ">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
+    modal.remove();
+    await deleteActivity(id);
+  });
+  document.getElementById('btn-cancel-delete').addEventListener('click', () => modal.remove());
+};
+
+async function deleteActivity(id) {
+  const { db, doc, deleteDoc, collection, getDocs } = window.__firebase;
+
+  // Feedback visual imediato — remove o card da tela
+  const card = document.getElementById(`history-card-${id}`);
+  if (card) {
+    card.style.transition = 'opacity 0.3s, transform 0.3s';
+    card.style.opacity = '0';
+    card.style.transform = 'translateX(40px)';
+    setTimeout(() => card.remove(), 300);
+  }
+
+  try {
+    // Remove subcoleções (likes e comments) antes de remover o documento
+    const likesSnap = await getDocs(collection(db, 'activities', id, 'likes')).catch(() => null);
+    if (likesSnap) {
+      await Promise.all(likesSnap.docs.map(d => deleteDoc(d.ref)));
+    }
+    const commentsSnap = await getDocs(collection(db, 'activities', id, 'comments')).catch(() => null);
+    if (commentsSnap) {
+      await Promise.all(commentsSnap.docs.map(d => deleteDoc(d.ref)));
+    }
+
+    // Remove o documento principal
+    await deleteDoc(doc(db, 'activities', id));
+
+    // Atualiza totais do usuário
+    if (State.userProfile && State.user) {
+      const { updateDoc } = window.__firebase;
+      const userRef = doc(db, 'users', State.user.uid);
+      const newRuns = Math.max(0, (State.userProfile.totalRuns || 1) - 1);
+      await updateDoc(userRef, { totalRuns: newRuns }).catch(() => { });
+    }
+
+    showToast('Atividade excluída ✅');
+
+    // Recarrega progresso e feed social
+    loadProgress();
+    if (State.currentPage === 'community') loadSocialFeed();
+
+  } catch (e) {
+    console.error('deleteActivity error:', e);
+    showToast('Erro ao excluir atividade.');
+    loadProgress(); // recarrega para restaurar o card
+  }
+}
+
 async function loadProgress() {
   const { db, collection, getDocs, query, orderBy, where } = window.__firebase;
   const listEl = document.getElementById('progress-list');
@@ -2026,21 +2115,28 @@ async function loadProgress() {
 
     listEl.innerHTML = `<h3 class="progress-section-title" style="padding:0 16px 12px">📋 Atividades Recentes</h3>` +
       activities.map(a => `
-        <div class="history-card" onclick="openActivityDetail('${a.id}')">
+        <div class="history-card" id="history-card-${a.id}">
           <div class="history-card-header">
             <span class="history-type-badge ${a.type || 'running'}">${a.type === 'walking' ? '🚶 Caminhada' : '🏃 Corrida'}</span>
             <span class="history-date">${formatDateFull(a.date)}</span>
+            <button class="btn-delete-activity" onclick="event.stopPropagation(); window.confirmDeleteActivity('${a.id}', '${(a.distance || 0).toFixed(2)}')" title="Excluir atividade">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+              </svg>
+            </button>
           </div>
-          <div class="history-main-stat">${(a.distance || 0).toFixed(2)} <span>km</span></div>
-          <div class="history-details">
-            <div class="history-detail"><div class="v">${formatDuration(a.duration || 0)}</div><div class="l">Duração</div></div>
-            <div class="history-detail"><div class="v">${a.pace || '--:--'}</div><div class="l">Ritmo</div></div>
-            <div class="history-detail"><div class="v">${Math.round(a.calories || 0)}</div><div class="l">kcal</div></div>
+          <div class="history-card-body" onclick="openActivityDetail('${a.id}')">
+            <div class="history-main-stat">${(a.distance || 0).toFixed(2)} <span>km</span></div>
+            <div class="history-details">
+              <div class="history-detail"><div class="v">${formatDuration(a.duration || 0)}</div><div class="l">Duração</div></div>
+              <div class="history-detail"><div class="v">${a.pace || '--:--'}</div><div class="l">Ritmo</div></div>
+              <div class="history-detail"><div class="v">${Math.round(a.calories || 0)}</div><div class="l">kcal</div></div>
+            </div>
+            ${a.kmSplits && a.kmSplits.length > 0 ? `
+            <div class="history-splits">
+              ${a.kmSplits.map(s => `<span class="split-badge">KM${s.km} ${s.pace}</span>`).join('')}
+            </div>` : ''}
           </div>
-          ${a.kmSplits && a.kmSplits.length > 0 ? `
-          <div class="history-splits">
-            ${a.kmSplits.map(s => `<span class="split-badge">KM${s.km} ${s.pace}</span>`).join('')}
-          </div>` : ''}
         </div>`
       ).join('');
   } catch (e) {
