@@ -436,9 +436,10 @@
       </button>
       <button class="nav-item nav-center active" data-page="activity">
         <div class="nav-center-btn">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          <!-- Boneco correndo -->
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="17" cy="3" r="1.5"/>
+            <path d="M10.5 8.5L8 17H10L11.5 12.5L14 15V21H16V13.5L13.5 11L14.5 7.5C15.7 8.9 17.4 9.8 19.5 10V8C17.8 8 16.3 7.1 15.5 5.8L14.5 4.3C14.1 3.7 13.5 3.3 12.8 3.3C12.5 3.3 12.2 3.4 12 3.5L7 5.5V10H9V6.8L10.5 6.2L9.5 10.5L12 13L10.5 8.5Z"/>
           </svg>
         </div>
         <span>Atividade</span>
@@ -548,7 +549,7 @@
         </svg>
         <div>
           <div class="drawer-app-name">PaceRun</div>
-          <div class="drawer-version" id="drawer-version">v1.6.0</div>
+          <div class="drawer-version" id="drawer-version">v1.7.0</div>
         </div>
       </div>
       <button class="drawer-close" id="btn-close-drawer">
@@ -636,7 +637,7 @@
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
         Novidades & Versão
-        <span class="drawer-badge">v1.6.0</span>
+        <span class="drawer-badge">v1.7.0</span>
       </button>
       <button class="drawer-item" id="drawer-btn-notifications">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -660,7 +661,7 @@
 
     <!-- Rodapé -->
     <div class="drawer-footer">
-      <p>PaceRun <span id="drawer-footer-version">v1.6.0</span></p>
+      <p>PaceRun <span id="drawer-footer-version">v1.7.0</span></p>
       <p style="margin-top:2px">Feito com ❤️ para corredores</p>
     </div>
   </div>
@@ -679,11 +680,27 @@
 
       <div class="releases-list">
 
-        <!-- v1.6.0 -->
+        <!-- v1.7.0 -->
         <div class="release-item current">
           <div class="release-header">
-            <span class="release-version">v1.6.0</span>
+            <span class="release-version">v1.7.0</span>
             <span class="release-badge current-badge">Atual</span>
+            <span class="release-date">Jun 2026</span>
+          </div>
+          <ul class="release-notes">
+            <li>📍 GPS completamente reescrito — distância precisa como apps profissionais</li>
+            <li>🔥 Calorias recalculadas com MET dinâmico baseado no pace real</li>
+            <li>📸 Compartilhamento com foto — WhatsApp envia link da foto junto</li>
+            <li>📱 Instagram: 3 estratégias (Web Share + arquivo, API nativa, fallback)</li>
+            <li>🏃 Botão de Atividade com ícone de corredor na barra de navegação</li>
+            <li>🗑️ Exclusão de atividades do Progresso e da Comunidade</li>
+          </ul>
+        </div>
+
+        <!-- v1.6.0 -->
+        <div class="release-item">
+          <div class="release-header">
+            <span class="release-version">v1.6.0</span>
             <span class="release-date">Jun 2026</span>
           </div>
           <ul class="release-notes">
@@ -692,14 +709,11 @@
             <li>✅ Botões CONCLUIR (vermelho) e RETOMAR (verde) na tela pausada</li>
             <li>📍 GPS aprimorado — funciona indoor e outdoor sem perder distância</li>
             <li>📸 Foto da atividade aparece no detalhe e no compartilhamento</li>
-            <li>📱 Instagram: abre foto para salvar + texto copiado automaticamente</li>
             <li>☰ Menu hamburguer movido para a barra de navegação inferior</li>
             <li>👥 Comunidade com feed social: curtir ❤️ e comentar 💬 atividades</li>
             <li>🔔 Notificação automática quando há nova versão disponível</li>
           </ul>
         </div>
-
-        <!-- v1.5.0 -->
         <div class="release-item">
           <div class="release-header">
             <span class="release-version">v1.5.0</span>

@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════
-   PACERUN — Service Worker v1.6.0
+   PACERUN — Service Worker v1.7.0
    ═══════════════════════════════════════════════════ */
 
-const APP_VERSION = 'v1.6.0';
+const APP_VERSION = 'v1.7.0';
 const CACHE_NAME = `pacerun-${APP_VERSION}`;
 
 const PRECACHE = [
@@ -25,12 +25,12 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
-      console.log('[SW v1.6.0] Caches encontrados:', keys);
+      console.log('[SW v1.7.0] Caches encontrados:', keys);
       return Promise.all(
         keys
           .filter(k => k !== CACHE_NAME) // deleta tudo exceto o atual
           .map(k => {
-            console.log('[SW v1.6.0] Deletando cache antigo:', k);
+            console.log('[SW v1.7.0] Deletando cache antigo:', k);
             return caches.delete(k);
           })
       );

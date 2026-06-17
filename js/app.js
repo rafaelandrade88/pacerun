@@ -839,19 +839,19 @@ function handleStop() {
 function onPositionUpdate(pos) {
   const { latitude, longitude, speed, accuracy } = pos.coords;
   const positions = State.activity.positions;
+  const now = Date.now();
 
   if (positions.length > 0) {
     const last = positions[positions.length - 1];
     const d = haversine(last.lat, last.lng, latitude, longitude);
 
-    // FIX: accuracy < 200 (era 50 — muito restrito, causava perda de 90% dos pontos)
-    // Filtro adicional: descarta saltos impossíveis (> 300m entre leituras)
-    const timeDiff = (Date.now() - (last.ts || Date.now())) / 1000 || 1;
-    const speedMs = (d * 1000) / timeDiff;
-    const plausible = speedMs < 15; // máx 54 km/h — impossível a pé
+    // timeDiff usa o ts salvo na posição anterior (correto)
+    const timeDiff = Math.max((now - (last.ts || now)) / 1000, 0.1);
+    const speedMs  = (d * 1000) / timeDiff; // m/s
+    // Aceita: mínimo 1m, máximo 72km/h (20m/s) — descarta teleportes GPS
+    const plausible = d > 0.001 && speedMs < 20;
 
-    // C4: Remove filtro accuracy — muito restritivo indoor. Só filtra teleportes impossíveis.
-    if (d > 0.001 && plausible) {
+    if (plausible) {
       const prevDist = State.activity.distance;
       State.activity.distance += d;
 
@@ -860,28 +860,43 @@ function onPositionUpdate(pos) {
       const prevKm = Math.floor(prevDist);
       const currKm = Math.floor(State.activity.distance);
       if (currKm > prevKm && currKm > 0) {
-        const elapsed = computeElapsed();
-        const kmTime = elapsed - (State.activity.kmSplits.reduce((s, k) => s + k.secs, 0));
-        const pace = kmTime / 60;
-        const paceMin = Math.floor(pace);
-        const paceSec = Math.round((pace - paceMin) * 60);
-        State.activity.kmSplits.push({
-          km: currKm,
-          secs: kmTime,
-          pace: `${paceMin}:${String(paceSec).padStart(2, '0')}`,
-        });
+        const elapsed  = computeElapsed();
+        const prevSecs = State.activity.kmSplits.reduce((s, k) => s + k.secs, 0);
+        const kmTime   = elapsed - prevSecs;
+        if (kmTime > 0) {
+          const pace    = kmTime / 60;
+          const paceMin = Math.floor(pace);
+          const paceSec = Math.round((pace - paceMin) * 60);
+          State.activity.kmSplits.push({
+            km: currKm,
+            secs: kmTime,
+            pace: `${paceMin}:${String(paceSec).padStart(2, '0')}`,
+          });
+        }
       }
 
       if (State.polyline) State.polyline.addLatLng([latitude, longitude]);
     }
   }
 
-  positions.push({ lat: latitude, lng: longitude, ts: Date.now() });
+  // Push DEPOIS do cálculo para que next call use ts correto
+  positions.push({ lat: latitude, lng: longitude, ts: now });
 
-  // Velocidade suavizada
-  const currentSpeed = speed != null && speed >= 0 ? speed * 3.6 : 0;
+  // Velocidade: prioriza dado do GPS (mais preciso), fallback para cálculo
+  let currentSpeed = 0;
+  if (speed != null && speed >= 0) {
+    currentSpeed = speed * 3.6; // m/s → km/h
+  } else if (positions.length >= 2) {
+    const prev     = positions[positions.length - 2];
+    const curr     = positions[positions.length - 1];
+    const dt       = Math.max((curr.ts - prev.ts) / 1000, 0.1);
+    const distKm   = haversine(prev.lat, prev.lng, curr.lat, curr.lng);
+    currentSpeed   = Math.min((distKm / dt) * 3600, 72);
+  }
+  currentSpeed = Math.min(currentSpeed, 72); // teto 72km/h
+
   if (!State.activity.recentSpeeds) State.activity.recentSpeeds = [];
-  if (currentSpeed > 0 && currentSpeed < 54) {
+  if (currentSpeed > 0) {
     State.activity.recentSpeeds.push(currentSpeed);
     if (State.activity.recentSpeeds.length > 5) State.activity.recentSpeeds.shift();
     State.activity.speeds.push(currentSpeed);
@@ -893,9 +908,9 @@ function onPositionUpdate(pos) {
     : 0;
 
   const speedEl = document.getElementById('act-speed');
-  const maxEl = document.getElementById('act-max-speed');
+  const maxEl   = document.getElementById('act-max-speed');
   if (speedEl) speedEl.textContent = smoothSpeed.toFixed(1);
-  if (maxEl) maxEl.textContent = State.activity.maxSpeed.toFixed(1);
+  if (maxEl)   maxEl.textContent   = State.activity.maxSpeed.toFixed(1);
 
   if (State.map) {
     State.map.setView([latitude, longitude], 17);
@@ -903,7 +918,7 @@ function onPositionUpdate(pos) {
       State.userMarker.setLatLng([latitude, longitude]);
     } else {
       State.userMarker = window.L?.circleMarker([latitude, longitude], {
-        radius: 8, fillColor: '#5BFFA0', fillOpacity: 1, color: '#1A6BF0', weight: 3
+        radius: 8, fillColor: '#5BFFA0', fillOpacity: 1, color: '#1A6BF0', weight: 3,
       }).addTo(State.map);
     }
   }
@@ -2387,20 +2402,20 @@ function openShareModal(activity) {
   State.currentActivity = activity;
   const preview = document.getElementById('share-preview');
   const a = activity;
-
+  const photo = a?.photo || a?.photoURL;
   const paceValido = a.pace && a.pace !== '--:--' && (a.distance || 0) >= 0.05;
 
   preview.innerHTML = `
-      ${a.photoURL ? `<img src="${a.photoURL}" style="width:100%;border-radius:10px;margin-bottom:12px;max-height:180px;object-fit:cover" alt="foto"/>` : ''}
-      <div style="padding:16px;background:var(--blue-900);border-radius:12px;text-align:center">
-        <div style="font-family:var(--font-display);font-size:40px;font-weight:800;color:var(--white)">${(a.distance || 0).toFixed(2)} <span style="font-size:20px;color:var(--blue-300)">km</span></div>
-        <div style="display:flex;gap:16px;justify-content:center;margin-top:10px;flex-wrap:wrap">
-          ${paceValido ? `<div><div style="font-size:16px;font-weight:700">${a.pace}</div><div style="font-size:11px;color:var(--text-muted)">Ritmo</div></div>` : ''}
-          <div><div style="font-size:16px;font-weight:700">${formatDuration(a.duration || 0)}</div><div style="font-size:11px;color:var(--text-muted)">Duração</div></div>
-          <div><div style="font-size:16px;font-weight:700">${Math.round(a.calories || 0)}</div><div style="font-size:11px;color:var(--text-muted)">kcal</div></div>
-        </div>
-        <div style="margin-top:10px;font-size:12px;color:var(--text-secondary)">via PaceRun 🏃</div>
-      </div>`;
+    ${photo ? `<img src="${photo}" style="width:100%;border-radius:10px;margin-bottom:12px;max-height:200px;object-fit:cover" alt="foto da corrida"/>` : ''}
+    <div style="padding:16px;background:var(--blue-900);border-radius:12px;text-align:center">
+      <div style="font-family:var(--font-display);font-size:40px;font-weight:800;color:var(--white)">${(a.distance || 0).toFixed(2)} <span style="font-size:20px;color:var(--blue-300)">km</span></div>
+      <div style="display:flex;gap:16px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+        ${paceValido ? `<div><div style="font-size:18px;font-weight:700">${a.pace}</div><div style="font-size:11px;color:var(--text-muted)">Ritmo</div></div>` : ''}
+        <div><div style="font-size:18px;font-weight:700">${formatDuration(a.duration || 0)}</div><div style="font-size:11px;color:var(--text-muted)">Duração</div></div>
+        <div><div style="font-size:18px;font-weight:700">${Math.round(a.calories || 0)}</div><div style="font-size:11px;color:var(--text-muted)">kcal</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-secondary)">via PaceRun 🏃‍♂️</div>
+    </div>`;
 
   document.getElementById('modal-share').classList.remove('hidden');
 }
@@ -2409,38 +2424,59 @@ function buildShareText() {
   const a = State.currentActivity;
   if (!a) return '';
   const paceValido = a.pace && a.pace !== '--:--' && (a.distance || 0) >= 0.05;
-  const paceInfo = paceValido ? `⚡ Ritmo: ${a.pace} /km | ` : '';
-  return `🏃 Acabei de completar ${(a.distance || 0).toFixed(2)} km em ${formatDuration(a.duration || 0)}!\n${paceInfo}🔥 ${Math.round(a.calories || 0)} kcal\n\nvia PaceRun`;
-}
-
-async function buildShareFiles() {
-  // Tenta compartilhar a foto junto com o texto se disponível
-  const a = State.currentActivity;
-  if (!a?.photoURL) return null;
-  try {
-    const resp = await fetch(a.photoURL);
-    const blob = await resp.blob();
-    const file = new File([blob], 'pacerun-corrida.jpg', { type: 'image/jpeg' });
-    return [file];
-  } catch { return null; }
+  const lines = [
+    `🏃 Acabei de completar ${(a.distance || 0).toFixed(2)} km em ${formatDuration(a.duration || 0)}!`,
+    paceValido ? `⚡ Ritmo: ${a.pace} /km` : '',
+    `🔥 ${Math.round(a.calories || 0)} kcal`,
+    '',
+    'via PaceRun 🏃‍♂️',
+  ];
+  return lines.filter(l => l !== null && l !== undefined && !(l === '' && lines.indexOf(l) === 0)).join('\n');
 }
 
 function shareWhatsApp() {
-  const text = encodeURIComponent(buildShareText());
-  window.open(`https://wa.me/?text=${text}`, '_blank');
+  const a    = State.currentActivity;
+  const text = buildShareText();
+  // Inclui link da foto se disponível
+  const photo = a?.photo || a?.photoURL;
+  const full  = photo ? `${text}\n\n📸 ${photo}` : text;
+  window.open(`https://wa.me/?text=${encodeURIComponent(full)}`, '_blank');
 }
 
 async function shareInstagramStories() {
-  // Instagram: tenta Web Share API com arquivo de imagem
-  const files = await buildShareFiles();
-  if (navigator.canShare && files && navigator.canShare({ files })) {
-    navigator.share({ files, title: 'Minha corrida no PaceRun', text: buildShareText() })
-      .catch(() => fallbackShare('Instagram'));
-  } else if (navigator.share) {
-    navigator.share({ title: 'Minha corrida no PaceRun', text: buildShareText() })
-      .catch(() => fallbackShare('Instagram'));
+  const a     = State.currentActivity;
+  const text  = buildShareText();
+  const photo = a?.photo || a?.photoURL;
+
+  // Estratégia 1: Web Share API com arquivo (funciona no Android Chrome)
+  if (photo && navigator.canShare) {
+    try {
+      const resp = await fetch(photo);
+      const blob = await resp.blob();
+      const file = new File([blob], 'pacerun.jpg', { type: 'image/jpeg' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'PaceRun', text });
+        return;
+      }
+    } catch { /* CORS bloqueou o fetch, segue para fallback */ }
+  }
+
+  // Estratégia 2: Web Share API sem arquivo
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Minha corrida no PaceRun', text });
+      return;
+    } catch { /* cancelado ou não suportado */ }
+  }
+
+  // Estratégia 3 (iOS): abre foto + copia texto
+  if (photo) {
+    copyToClipboard(text);
+    window.open(photo, '_blank');
+    showToast('📸 Foto aberta! Texto copiado — salve a foto e cole nos Stories', 5000);
   } else {
-    fallbackShare('Instagram');
+    copyToClipboard(text);
+    showToast('Texto copiado! Abra o Instagram e cole nos Stories 📋', 4000);
   }
 }
 
@@ -2450,35 +2486,49 @@ function fallbackShare(platform) {
 }
 
 function shareFacebook() {
+  const text = buildShareText();
   if (navigator.share) {
-    navigator.share({ title: 'Minha corrida no PaceRun', text: buildShareText() })
-      .catch(() => fallbackShare('Facebook'));
+    navigator.share({ title: 'Minha corrida no PaceRun', text })
+      .catch(() => { copyToClipboard(text); showToast('Texto copiado!'); });
   } else {
-    fallbackShare('Facebook');
+    copyToClipboard(text);
+    showToast('Texto copiado! Abra o Facebook e cole 📋', 4000);
   }
 }
 
 async function shareNative() {
-  const files = await buildShareFiles();
-  const shareData = {
-    title: 'Minha atividade no PaceRun',
-    text: buildShareText(),
-    ...(files && navigator.canShare?.({ files }) ? { files } : {}),
-  };
+  const a     = State.currentActivity;
+  const text  = buildShareText();
+  const photo = a?.photo || a?.photoURL;
+  if (photo && navigator.canShare) {
+    try {
+      const resp = await fetch(photo);
+      const blob = await resp.blob();
+      const file = new File([blob], 'pacerun.jpg', { type: 'image/jpeg' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'PaceRun', text });
+        return;
+      }
+    } catch { /* segue */ }
+  }
   if (navigator.share) {
-    navigator.share(shareData).catch(() => {
-      copyToClipboard(buildShareText());
-      showToast('Texto copiado!');
+    navigator.share({ title: 'PaceRun', text }).catch(() => {
+      copyToClipboard(text); showToast('Texto copiado!');
     });
   } else {
-    copyToClipboard(buildShareText());
+    copyToClipboard(text);
     showToast('Texto copiado para a área de transferência!');
   }
 }
 
 function copyToClipboard(text) {
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).catch(() => { });
+    navigator.clipboard.writeText(text).catch(() => {});
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
   }
 }
 
@@ -2495,8 +2545,24 @@ function haversine(lat1, lon1, lat2, lon2) {
 
 function calcCalories(distKm, durationSec) {
   const weight = State.userProfile?.weight || 70;
-  const MET = State.activity.type === 'running' ? 8.5 : 3.5;
-  const hours = durationSec / 3600;
+  const hours  = durationSec / 3600;
+  if (hours <= 0 || distKm <= 0) return 0;
+
+  // MET dinâmico baseado na velocidade média real (km/h)
+  // Referência: Compendium of Physical Activities
+  const avgKmh = distKm / hours;
+  let MET;
+  if (avgKmh < 3)       MET = 2.5;  // caminhada lenta
+  else if (avgKmh < 5)  MET = 3.5;  // caminhada normal
+  else if (avgKmh < 6)  MET = 4.5;  // caminhada rápida
+  else if (avgKmh < 7)  MET = 6.0;  // trote leve
+  else if (avgKmh < 8)  MET = 7.0;  // corrida leve (pace ~8:30/km)
+  else if (avgKmh < 9)  MET = 8.0;  // corrida moderada (pace ~7:00/km)
+  else if (avgKmh < 10) MET = 9.0;  // corrida (pace ~6:00/km)
+  else if (avgKmh < 12) MET = 10.0; // corrida rápida
+  else if (avgKmh < 14) MET = 11.5; // corrida muito rápida
+  else                  MET = 13.0; // sprint
+
   return MET * weight * hours;
 }
 
@@ -2852,7 +2918,7 @@ window.loadMoreEvents = function () {
 // ════════════════════════════════════════════════════════
 // MENU HAMBURGUER
 // ════════════════════════════════════════════════════════
-const APP_VERSION = 'v1.6.0';
+const APP_VERSION = 'v1.7.0';
 
 function setupHamburgerMenu() {
   const overlay = document.getElementById('hamburger-overlay');
