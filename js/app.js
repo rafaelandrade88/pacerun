@@ -763,6 +763,7 @@ function startActivity() {
   State.activity.maxSpeed = 0;
   State.activity.kmSplits = [];
   State.activity.photo = null;
+  State.activity.gpsWarmupCount = 0; // contador de leituras para warm-up do GPS
 
   showRunningScreen();
   initMap();
@@ -829,6 +830,7 @@ function handleStop() {
     photo: State.activity.photo,
     positions: State.activity.positions,
     kmSplits: State.activity.kmSplits || [],
+    gpsLog: State.activity.gpsLog || [], // diagnóstico GPS desta corrida
     timestamp: Date.now(),
   };
 
@@ -841,30 +843,57 @@ function onPositionUpdate(pos) {
   const positions = State.activity.positions;
   const now = Date.now();
 
-  if (positions.length > 0) {
-    const last = positions[positions.length - 1];
-    const d = haversine(last.lat, last.lng, latitude, longitude);
+  // ── Log de diagnóstico (sempre ativo durante a corrida) ────
+  // Guarda cada leitura bruta do GPS para podermos auditar com dados REAIS
+  // se a distância calculada divergir do esperado. Acessível em "Exportar log GPS"
+  // no menu da tela de atividade.
+  if (!State.activity.gpsLog) State.activity.gpsLog = [];
 
-    // timeDiff usa o ts salvo na posição anterior (correto)
+  let logEntry = {
+    t: now,
+    lat: latitude.toFixed(6),
+    lng: longitude.toFixed(6),
+    acc: accuracy != null ? Math.round(accuracy) : null,
+    spd: speed != null ? (speed * 3.6).toFixed(1) : null,
+    accepted: false,
+    deltaM: null,
+    distAfter: null,
+  };
+
+  // ── Filtro: descarta apenas leituras com accuracy muito ruim ──
+  // (acima de 100m é tipicamente reflexo/multipath em área urbana densa,
+  // não representa a posição real do usuário)
+  const accuracyOk = accuracy == null || accuracy <= 100;
+
+  if (positions.length > 0 && accuracyOk) {
+    const last = positions[positions.length - 1];
+    const d = haversine(last.lat, last.lng, latitude, longitude); // km
+    const deltaM = d * 1000;
+    logEntry.deltaM = deltaM.toFixed(1);
+
     const timeDiff = Math.max((now - (last.ts || now)) / 1000, 0.1);
-    const speedMs  = (d * 1000) / timeDiff; // m/s
-    // Aceita: mínimo 1m, máximo 72km/h (20m/s) — descarta teleportes GPS
-    const plausible = d > 0.001 && speedMs < 20;
+    const speedMs = deltaM / timeDiff;
+
+    // Plausibilidade: humano correndo rápido chega a ~6 m/s (21.6km/h).
+    // Damos margem até 8 m/s (28.8km/h) para variações de GPS.
+    // SEM filtro de distância mínima — esse é o erro que causava perda de
+    // distância real: muitos passos pequenos sendo descartados um a um.
+    const plausible = speedMs < 8;
 
     if (plausible) {
-      const prevDist = State.activity.distance;
       State.activity.distance += d;
+      logEntry.accepted = true;
 
       // Rastreamento de pace por km
       if (!State.activity.kmSplits) State.activity.kmSplits = [];
-      const prevKm = Math.floor(prevDist);
+      const prevKm = Math.floor(State.activity.distance - d);
       const currKm = Math.floor(State.activity.distance);
       if (currKm > prevKm && currKm > 0) {
-        const elapsed  = computeElapsed();
+        const elapsed = computeElapsed();
         const prevSecs = State.activity.kmSplits.reduce((s, k) => s + k.secs, 0);
-        const kmTime   = elapsed - prevSecs;
+        const kmTime = elapsed - prevSecs;
         if (kmTime > 0) {
-          const pace    = kmTime / 60;
+          const pace = kmTime / 60;
           const paceMin = Math.floor(pace);
           const paceSec = Math.round((pace - paceMin) * 60);
           State.activity.kmSplits.push({
@@ -877,23 +906,30 @@ function onPositionUpdate(pos) {
 
       if (State.polyline) State.polyline.addLatLng([latitude, longitude]);
     }
+  } else if (positions.length === 0) {
+    // Primeiro ponto sempre aceito como referência inicial
+    logEntry.accepted = true;
   }
 
-  // Push DEPOIS do cálculo para que next call use ts correto
-  positions.push({ lat: latitude, lng: longitude, ts: now });
+  logEntry.distAfter = State.activity.distance.toFixed(3);
+  State.activity.gpsLog.push(logEntry);
 
-  // Velocidade: prioriza dado do GPS (mais preciso), fallback para cálculo
+  // Salva a posição sempre (mesmo com accuracy ruim) para não perder
+  // a referência temporal — mas só usa accuracy boa para o cálculo acima
+  positions.push({ lat: latitude, lng: longitude, ts: now, accuracy: accuracy || null });
+
+  // ── Velocidade instantânea exibida na tela ──────────────────
   let currentSpeed = 0;
   if (speed != null && speed >= 0) {
-    currentSpeed = speed * 3.6; // m/s → km/h
+    currentSpeed = speed * 3.6; // m/s → km/h (sensor do GPS)
   } else if (positions.length >= 2) {
-    const prev     = positions[positions.length - 2];
-    const curr     = positions[positions.length - 1];
-    const dt       = Math.max((curr.ts - prev.ts) / 1000, 0.1);
-    const distKm   = haversine(prev.lat, prev.lng, curr.lat, curr.lng);
-    currentSpeed   = Math.min((distKm / dt) * 3600, 72);
+    const prev = positions[positions.length - 2];
+    const curr = positions[positions.length - 1];
+    const dt = Math.max((curr.ts - prev.ts) / 1000, 0.1);
+    const distKm = haversine(prev.lat, prev.lng, curr.lat, curr.lng);
+    currentSpeed = Math.min((distKm / dt) * 3600, 30);
   }
-  currentSpeed = Math.min(currentSpeed, 72); // teto 72km/h
+  currentSpeed = Math.min(currentSpeed, 30);
 
   if (!State.activity.recentSpeeds) State.activity.recentSpeeds = [];
   if (currentSpeed > 0) {
@@ -908,9 +944,9 @@ function onPositionUpdate(pos) {
     : 0;
 
   const speedEl = document.getElementById('act-speed');
-  const maxEl   = document.getElementById('act-max-speed');
+  const maxEl = document.getElementById('act-max-speed');
   if (speedEl) speedEl.textContent = smoothSpeed.toFixed(1);
-  if (maxEl)   maxEl.textContent   = State.activity.maxSpeed.toFixed(1);
+  if (maxEl) maxEl.textContent = State.activity.maxSpeed.toFixed(1);
 
   if (State.map) {
     State.map.setView([latitude, longitude], 17);
@@ -923,6 +959,23 @@ function onPositionUpdate(pos) {
     }
   }
 }
+
+// ── Exporta o log de GPS da corrida (diagnóstico) ─────────────
+window.exportGpsLog = function () {
+  const log = State.activity.gpsLog || State.currentActivity?.gpsLog;
+  if (!log || log.length === 0) {
+    showToast('Nenhum log de GPS disponível.');
+    return;
+  }
+  const header = 't_ms\tlat\tlng\taccuracy_m\tspeed_kmh\taccepted\tdelta_m\tdist_total_km\n';
+  const rows = log.map(l =>
+    `${l.t}\t${l.lat}\t${l.lng}\t${l.acc ?? ''}\t${l.spd ?? ''}\t${l.accepted}\t${l.deltaM ?? ''}\t${l.distAfter}`
+  ).join('\n');
+  const text = header + rows;
+
+  copyToClipboard(text);
+  showToast(`Log copiado! ${log.length} leituras de GPS na área de transferência 📋`, 5000);
+};
 
 function updateActivityUI() {
   // Não atualiza calorias se pausado — evita contar parado
@@ -1140,6 +1193,15 @@ function showSummaryModal(act) {
     </div>
 
     ${buildKmSplitsHtml(act.kmSplits)}
+
+    <button onclick="window.exportGpsLog()" style="
+      width:100%; margin-top:14px; padding:12px;
+      background:var(--surface2); border:1px dashed var(--blue-300);
+      border-radius:10px; color:var(--blue-300);
+      font-family:var(--font-body); font-size:13px; font-weight:600;
+      cursor:pointer;">
+      🛰️ Exportar log de GPS (diagnóstico — ${(act.gpsLog || []).length} leituras)
+    </button>
   `;
 
   document.getElementById('summary-photo-preview').classList.add('hidden');
@@ -2435,17 +2497,17 @@ function buildShareText() {
 }
 
 function shareWhatsApp() {
-  const a    = State.currentActivity;
+  const a = State.currentActivity;
   const text = buildShareText();
   // Inclui link da foto se disponível
   const photo = a?.photo || a?.photoURL;
-  const full  = photo ? `${text}\n\n📸 ${photo}` : text;
+  const full = photo ? `${text}\n\n📸 ${photo}` : text;
   window.open(`https://wa.me/?text=${encodeURIComponent(full)}`, '_blank');
 }
 
 async function shareInstagramStories() {
-  const a     = State.currentActivity;
-  const text  = buildShareText();
+  const a = State.currentActivity;
+  const text = buildShareText();
   const photo = a?.photo || a?.photoURL;
 
   // Estratégia 1: Web Share API com arquivo (funciona no Android Chrome)
@@ -2497,8 +2559,8 @@ function shareFacebook() {
 }
 
 async function shareNative() {
-  const a     = State.currentActivity;
-  const text  = buildShareText();
+  const a = State.currentActivity;
+  const text = buildShareText();
   const photo = a?.photo || a?.photoURL;
   if (photo && navigator.canShare) {
     try {
@@ -2523,7 +2585,7 @@ async function shareNative() {
 
 function copyToClipboard(text) {
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).catch(() => {});
+    navigator.clipboard.writeText(text).catch(() => { });
   } else {
     const ta = document.createElement('textarea');
     ta.value = text; document.body.appendChild(ta);
@@ -2545,23 +2607,23 @@ function haversine(lat1, lon1, lat2, lon2) {
 
 function calcCalories(distKm, durationSec) {
   const weight = State.userProfile?.weight || 70;
-  const hours  = durationSec / 3600;
+  const hours = durationSec / 3600;
   if (hours <= 0 || distKm <= 0) return 0;
 
   // MET dinâmico baseado na velocidade média real (km/h)
   // Referência: Compendium of Physical Activities
   const avgKmh = distKm / hours;
   let MET;
-  if (avgKmh < 3)       MET = 2.5;  // caminhada lenta
-  else if (avgKmh < 5)  MET = 3.5;  // caminhada normal
-  else if (avgKmh < 6)  MET = 4.5;  // caminhada rápida
-  else if (avgKmh < 7)  MET = 6.0;  // trote leve
-  else if (avgKmh < 8)  MET = 7.0;  // corrida leve (pace ~8:30/km)
-  else if (avgKmh < 9)  MET = 8.0;  // corrida moderada (pace ~7:00/km)
+  if (avgKmh < 3) MET = 2.5;  // caminhada lenta
+  else if (avgKmh < 5) MET = 3.5;  // caminhada normal
+  else if (avgKmh < 6) MET = 4.5;  // caminhada rápida
+  else if (avgKmh < 7) MET = 6.0;  // trote leve
+  else if (avgKmh < 8) MET = 7.0;  // corrida leve (pace ~8:30/km)
+  else if (avgKmh < 9) MET = 8.0;  // corrida moderada (pace ~7:00/km)
   else if (avgKmh < 10) MET = 9.0;  // corrida (pace ~6:00/km)
   else if (avgKmh < 12) MET = 10.0; // corrida rápida
   else if (avgKmh < 14) MET = 11.5; // corrida muito rápida
-  else                  MET = 13.0; // sprint
+  else MET = 13.0; // sprint
 
   return MET * weight * hours;
 }
