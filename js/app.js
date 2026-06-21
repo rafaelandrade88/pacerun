@@ -6,6 +6,22 @@
 
 'use strict';
 
+// ── Diagnóstico de crash: registra erros não tratados durante a corrida ──
+window.addEventListener('error', e => {
+  console.error('Uncaught error:', e.message, e.filename, e.lineno);
+  if (State.activity?.running) {
+    if (!State.activity.gpsLog) State.activity.gpsLog = [];
+    State.activity.gpsLog.push({ t: Date.now(), error: `${e.message} @ ${e.filename}:${e.lineno}` });
+  }
+});
+window.addEventListener('unhandledrejection', e => {
+  console.error('Unhandled rejection:', e.reason);
+  if (State.activity?.running) {
+    if (!State.activity.gpsLog) State.activity.gpsLog = [];
+    State.activity.gpsLog.push({ t: Date.now(), error: `unhandledrejection: ${e.reason}` });
+  }
+});
+
 // ── Estado global ─────────────────────────────────────────
 const State = {
   user: null,
@@ -749,9 +765,24 @@ function showPausedScreen() {
   setTxt('paused-pace', paceStr);
 }
 
+let wakeLock = null;
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+  } catch (e) { console.warn('WakeLock:', e); }
+}
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && State.activity.running) acquireWakeLock();
+});
+
 function startActivity() {
   if (!navigator.geolocation) { showToast('GPS não disponível neste dispositivo.'); return; }
 
+  acquireWakeLock();
   State.activity.running = true;
   State.activity.paused = false;
   State.activity.startTime = Date.now();
@@ -801,6 +832,7 @@ function handleStop() {
 
   clearInterval(State.activity.intervalId);
   navigator.geolocation.clearWatch(State.activity.watchId);
+  releaseWakeLock();
   State.activity.running = false;
   State.activity.paused = false;
   localStorage.removeItem('pacerun_active_run');
@@ -1220,6 +1252,7 @@ function resetActivity() {
   if (State.activity.watchId != null) {
     navigator.geolocation.clearWatch(State.activity.watchId);
   }
+  releaseWakeLock();
 
   Object.assign(State.activity, {
     running: false, paused: false,
