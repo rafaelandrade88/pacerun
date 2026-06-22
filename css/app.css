@@ -513,8 +513,10 @@ body {
   background: var(--blue-400);
 }
 
-.nav-center svg {
+.nav-center svg,
+.nav-item.nav-center.active svg {
   stroke: white;
+  fill: white;
 }
 
 /* ── ACTIVITY PAGE ───────────────────────────────────── */
