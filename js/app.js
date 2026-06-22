@@ -776,7 +776,14 @@ function releaseWakeLock() {
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && State.activity.running) acquireWakeLock();
+  if (document.visibilityState === 'visible' && State.activity.running) {
+    acquireWakeLock();
+  } else if (document.visibilityState === 'hidden' && State.activity.running) {
+    // Tela vai bloquear/app vai pra segundo plano: salva o estado atual
+    // imediatamente, já que o setInterval de 1s fica throttled em background
+    // e pode não rodar a tempo antes do navegador suspender/matar a aba.
+    persistActivityState();
+  }
 });
 
 function startActivity() {
@@ -949,6 +956,12 @@ function onPositionUpdate(pos) {
   // Salva a posição sempre (mesmo com accuracy ruim) para não perder
   // a referência temporal — mas só usa accuracy boa para o cálculo acima
   positions.push({ lat: latitude, lng: longitude, ts: now, accuracy: accuracy || null });
+
+  // Persiste a cada leitura de GPS (não só no timer de 1s), pois em segundo
+  // plano o setInterval é throttled mas o watchPosition costuma continuar
+  // recebendo leituras por mais tempo — maximiza o que conseguimos recuperar
+  // se o navegador suspender/matar a aba logo em seguida.
+  persistActivityState();
 
   // ── Velocidade instantânea exibida na tela ──────────────────
   let currentSpeed = 0;
