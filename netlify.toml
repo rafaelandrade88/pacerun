@@ -1,0 +1,28 @@
+# PaceRun — Configuração do Netlify
+# As variáveis de ambiente são definidas em:
+# Netlify → Site settings → Environment variables
+
+[build]
+  # Comando que o Netlify executa a cada deploy
+  command = "node build.js"
+  
+  # Pasta publicada após o build (gerada pelo build.js)
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Headers de segurança
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options         = "DENY"
+    X-Content-Type-Options  = "nosniff"
+    Referrer-Policy         = "strict-origin-when-cross-origin"
+
+# Service Worker precisa de escopo correto
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Service-Worker-Allowed = "/"

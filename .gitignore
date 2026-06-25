@@ -1,0 +1,18 @@
+# ─── Variáveis de ambiente (NUNCA commitar) ───────────────
+.env
+.env.local
+.env.production
+.env*.local
+
+# ─── Pasta de build (gerada pelo Netlify, não vai pro git) ─
+dist/
+
+# ─── Node ─────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ─── macOS ────────────────────────────────────────────────
+.DS_Store
+
+# ─── VS Code ──────────────────────────────────────────────
+.vscode/
