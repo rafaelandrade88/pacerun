@@ -23,7 +23,7 @@
   <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     // Firebase Storage removido — usando Cloudinary (gratuito, sem cartão)
 
@@ -44,7 +44,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    window.__firebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential, doc, setDoc, getDoc, deleteDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp };
+    window.__firebase = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential, GoogleAuthProvider, signInWithPopup, doc, setDoc, getDoc, deleteDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp };
 
     window.dispatchEvent(new Event('firebase-ready'));
   </script>
@@ -106,787 +106,820 @@
         <button class="btn-primary" id="btn-login">Entrar</button>
         <button class="btn-ghost" id="btn-forgot">Esqueci minha senha</button>
         <div id="login-error" class="form-error hidden"></div>
-      </div>
-      <div class="auth-divider"><span>Novo por aqui?</span></div>
-      <button class="btn-outline-blue" id="btn-go-register">Criar uma conta gratuita</button>
-    </div>
 
-    <!-- ── ETAPA 2: Cadastro — só e-mail ── -->
-    <div class="auth-container hidden" id="auth-step-email">
-      <button class="auth-back-btn" id="btn-back-to-login">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-          stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-        Voltar
-      </button>
-      <div class="auth-logo">
-        <div class="auth-step-icon">📧</div>
-        <h1>Criar conta</h1>
-        <p>Informe seu e-mail para começar</p>
-      </div>
-      <div class="auth-form">
-        <div class="form-group">
-          <label>Seu e-mail</label>
-          <input type="email" id="reg-email" placeholder="seu@email.com" autocomplete="email" />
-        </div>
-        <button class="btn-primary" id="btn-send-link">Enviar link de acesso</button>
-        <div id="reg-error" class="form-error hidden"></div>
-        <div id="reg-success" class="form-success hidden">
-          ✉️ Link enviado! Verifique sua caixa de entrada e clique no link para continuar o cadastro.
-        </div>
-      </div>
-    </div>
+        <!-- Divisor -->
+        <div class="auth-divider-or"><span>ou</span></div>
 
-    <!-- ── ETAPA 3: Completa cadastro (nome + senha) — acessada via link do e-mail ── -->
-    <div class="auth-container hidden" id="auth-step-complete">
-      <div class="auth-logo">
-        <div class="auth-step-icon">🏃</div>
-        <h1>Quase lá!</h1>
-        <p>Complete seu perfil para começar</p>
-      </div>
-      <div class="auth-form">
-        <div class="form-group">
-          <label>Seu nome</label>
-          <input type="text" id="complete-name" placeholder="Como quer ser chamado?" autocomplete="name" />
-        </div>
-        <div class="form-group">
-          <label>Crie uma senha</label>
-          <input type="password" id="complete-password" placeholder="mínimo 6 caracteres" autocomplete="new-password" />
-        </div>
-        <div class="form-group">
-          <label>Confirmar senha</label>
-          <input type="password" id="complete-password2" placeholder="repita a senha" autocomplete="new-password" />
-        </div>
-        <button class="btn-primary" id="btn-complete-register">Criar minha conta</button>
-        <div id="complete-error" class="form-error hidden"></div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════════ APP -->
-  <div id="app" class="hidden">
-
-    <!-- TOP HEADER -->
-    <header class="app-header" id="app-header">
-      <div class="header-left">
-        <img id="header-avatar" class="header-avatar" style="cursor:pointer" onclick="openDrawer()"
-          src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=64" alt="avatar" />
-        <div>
-          <p class="header-greeting">Bom dia,</p>
-          <p class="header-name" id="header-name">Atleta</p>
-        </div>
-      </div>
-      <div class="header-right">
-        <button class="icon-btn notif-btn" id="btn-notifications">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        <!-- Login com Google -->
+        <button class="btn-google" id="btn-login-google">
+          <svg width="20" height="20" viewBox="0 0 48 48">
+            <path fill="#EA4335"
+              d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+            <path fill="#4285F4"
+              d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+            <path fill="#FBBC05"
+              d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+            <path fill="#34A853"
+              d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
           </svg>
-          <span class="notif-badge hidden" id="notif-badge">0</span>
+          Entrar com Google
         </button>
+        <div class="auth-divider"><span>Novo por aqui?</span></div>
+        <button class="btn-outline-blue" id="btn-go-register">Criar uma conta gratuita</button>
       </div>
-    </header>
 
-    <!-- PAGES -->
-    <main class="app-main" id="app-main">
-
-      <!-- ── PAGE: ATIVIDADE ── -->
-      <section id="page-activity" class="page active">
-
-        <!-- ── TELA IDLE: antes de iniciar ── -->
-        <div id="activity-idle-screen" class="activity-idle-screen">
-          <div class="idle-content">
-            <div class="idle-icon">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#1A6BF0" stroke-width="1.5"
-                stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-              </svg>
-            </div>
-            <h2 class="idle-title">Pronto para correr?</h2>
-            <p class="idle-subtitle">GPS será ativado ao iniciar</p>
-            <button class="btn-iniciar-ao-vivo" id="btn-iniciar-ao-vivo">
-              INICIAR AO VIVO
-            </button>
+      <!-- ── ETAPA 2: Cadastro — só e-mail ── -->
+      <div class="auth-container hidden" id="auth-step-email">
+        <button class="auth-back-btn" id="btn-back-to-login">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Voltar
+        </button>
+        <div class="auth-logo">
+          <div class="auth-step-icon">📧</div>
+          <h1>Criar conta</h1>
+          <p>Informe seu e-mail para começar</p>
+        </div>
+        <div class="auth-form">
+          <div class="form-group">
+            <label>Seu e-mail</label>
+            <input type="email" id="reg-email" placeholder="seu@email.com" autocomplete="email" />
+          </div>
+          <button class="btn-primary" id="btn-send-link">Enviar link de acesso</button>
+          <div id="reg-error" class="form-error hidden"></div>
+          <div id="reg-success" class="form-success hidden">
+            ✉️ Link enviado! Verifique sua caixa de entrada e clique no link para continuar o cadastro.
           </div>
         </div>
+      </div>
 
-        <!-- ── TELA RUNNING: durante a corrida ── -->
-        <div id="activity-running-screen" class="activity-running-screen hidden">
-          <!-- Stats no topo -->
-          <div class="activity-stats-grid">
-            <div class="stat-card main-stat">
-              <span class="stat-value" id="act-distance">0.00</span>
-              <span class="stat-unit">km</span>
-              <span class="stat-label">distância</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-value" id="act-duration">00:00</span>
-              <span class="stat-label">duração</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-value" id="act-pace">--:--</span>
-              <span class="stat-label">ritmo /km</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-value" id="act-calories">0</span>
-              <span class="stat-label">kcal</span>
-            </div>
+      <!-- ── ETAPA 3: Completa cadastro (nome + senha) — acessada via link do e-mail ── -->
+      <div class="auth-container hidden" id="auth-step-complete">
+        <div class="auth-logo">
+          <div class="auth-step-icon">🏃</div>
+          <h1>Quase lá!</h1>
+          <p>Complete seu perfil para começar</p>
+        </div>
+        <div class="auth-form">
+          <div class="form-group">
+            <label>Seu nome</label>
+            <input type="text" id="complete-name" placeholder="Como quer ser chamado?" autocomplete="name" />
           </div>
-          <!-- Mapa -->
-          <div class="activity-map" id="activity-map">
-            <div id="map-container" style="width:100%;height:100%;overflow:hidden;"></div>
-            <div class="gps-indicator" id="gps-indicator">
-              <span class="gps-dot active"></span> GPS
-            </div>
-            <div class="speed-overlay">
-              <div class="speed-item-sm"><span id="act-speed">0.0</span><label>km/h</label></div>
-              <div class="speed-item-sm"><span id="act-avg-speed">0.0</span><label>média</label></div>
-              <div class="speed-item-sm"><span id="act-max-speed">0.0</span><label>máx</label></div>
-            </div>
+          <div class="form-group">
+            <label>Crie uma senha</label>
+            <input type="password" id="complete-password" placeholder="mínimo 6 caracteres"
+              autocomplete="new-password" />
           </div>
-          <!-- Botão deslize para pausar -->
-          <div class="slide-to-pause-wrap">
-            <div class="slide-to-pause" id="slide-to-pause">
-              <div class="slide-thumb" id="slide-thumb">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="6" y="4" width="4" height="16" />
-                  <rect x="14" y="4" width="4" height="16" />
+          <div class="form-group">
+            <label>Confirmar senha</label>
+            <input type="password" id="complete-password2" placeholder="repita a senha" autocomplete="new-password" />
+          </div>
+          <button class="btn-primary" id="btn-complete-register">Criar minha conta</button>
+          <div id="complete-error" class="form-error hidden"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ APP -->
+    <div id="app" class="hidden">
+
+      <!-- TOP HEADER -->
+      <header class="app-header" id="app-header">
+        <div class="header-left">
+          <img id="header-avatar" class="header-avatar" style="cursor:pointer" onclick="openDrawer()"
+            src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=64" alt="avatar" />
+          <div>
+            <p class="header-greeting">Bom dia,</p>
+            <p class="header-name" id="header-name">Atleta</p>
+          </div>
+        </div>
+        <div class="header-right">
+          <button class="icon-btn notif-btn" id="btn-notifications">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            <span class="notif-badge hidden" id="notif-badge">0</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- PAGES -->
+      <main class="app-main" id="app-main">
+
+        <!-- ── PAGE: ATIVIDADE ── -->
+        <section id="page-activity" class="page active">
+
+          <!-- ── TELA IDLE: antes de iniciar ── -->
+          <div id="activity-idle-screen" class="activity-idle-screen">
+            <div class="idle-content">
+              <div class="idle-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#1A6BF0" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                 </svg>
               </div>
-              <span class="slide-label">deslize para pausar</span>
+              <h2 class="idle-title">Pronto para correr?</h2>
+              <p class="idle-subtitle">GPS será ativado ao iniciar</p>
+              <button class="btn-iniciar-ao-vivo" id="btn-iniciar-ao-vivo">
+                INICIAR AO VIVO
+              </button>
             </div>
           </div>
-        </div>
 
-        <!-- ── TELA PAUSADA: botões CONCLUIR e RETOMAR ── -->
-        <div id="activity-paused-screen" class="activity-paused-screen hidden">
-          <div class="paused-header">PAUSADO</div>
-          <div class="paused-duration" id="paused-duration">00:00</div>
-          <div class="paused-label">Duração</div>
-          <div class="paused-metrics-row">
-            <div class="paused-metric">
-              <div class="paused-metric-val" id="paused-distance">0.00</div>
-              <div class="paused-metric-lbl">Distância (km)</div>
+          <!-- ── TELA RUNNING: durante a corrida ── -->
+          <div id="activity-running-screen" class="activity-running-screen hidden">
+            <!-- Stats no topo -->
+            <div class="activity-stats-grid">
+              <div class="stat-card main-stat">
+                <span class="stat-value" id="act-distance">0.00</span>
+                <span class="stat-unit">km</span>
+                <span class="stat-label">distância</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-value" id="act-duration">00:00</span>
+                <span class="stat-label">duração</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-value" id="act-pace">--:--</span>
+                <span class="stat-label">ritmo /km</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-value" id="act-calories">0</span>
+                <span class="stat-label">kcal</span>
+              </div>
             </div>
-            <div class="paused-metric">
-              <div class="paused-metric-val" id="paused-calories">0</div>
-              <div class="paused-metric-lbl">Calorias (kcal)</div>
+            <!-- Mapa -->
+            <div class="activity-map" id="activity-map">
+              <div id="map-container" style="width:100%;height:100%;overflow:hidden;"></div>
+              <div class="gps-indicator" id="gps-indicator">
+                <span class="gps-dot active"></span> GPS
+              </div>
+              <div class="speed-overlay">
+                <div class="speed-item-sm"><span id="act-speed">0.0</span><label>km/h</label></div>
+                <div class="speed-item-sm"><span id="act-avg-speed">0.0</span><label>média</label></div>
+                <div class="speed-item-sm"><span id="act-max-speed">0.0</span><label>máx</label></div>
+              </div>
             </div>
-            <div class="paused-metric">
-              <div class="paused-metric-val" id="paused-pace">--:--</div>
-              <div class="paused-metric-lbl">Ritmo médio (min/km)</div>
+            <!-- Botão deslize para pausar -->
+            <div class="slide-to-pause-wrap">
+              <div class="slide-to-pause" id="slide-to-pause">
+                <div class="slide-thumb" id="slide-thumb">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="4" width="4" height="16" />
+                    <rect x="14" y="4" width="4" height="16" />
+                  </svg>
+                </div>
+                <span class="slide-label">deslize para pausar</span>
+              </div>
             </div>
           </div>
-          <div class="paused-map-area" id="paused-map-area"></div>
-          <div class="paused-actions">
-            <button class="paused-btn paused-btn-stop" id="btn-concluir">CONCLUIR</button>
-            <button class="paused-btn paused-btn-resume" id="btn-resume-paused">RETOMAR</button>
-          </div>
-        </div>
 
-      </section>
-
-      <!-- ── PAGE: FEED ── -->
-      <section id="page-feed" class="page">
-        <div class="page-header">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div>
-              <h2>Feed</h2>
-              <p id="feed-location-label">Carregando localização...</p>
+          <!-- ── TELA PAUSADA: botões CONCLUIR e RETOMAR ── -->
+          <div id="activity-paused-screen" class="activity-paused-screen hidden">
+            <div class="paused-header">PAUSADO</div>
+            <div class="paused-duration" id="paused-duration">00:00</div>
+            <div class="paused-label">Duração</div>
+            <div class="paused-metrics-row">
+              <div class="paused-metric">
+                <div class="paused-metric-val" id="paused-distance">0.00</div>
+                <div class="paused-metric-lbl">Distância (km)</div>
+              </div>
+              <div class="paused-metric">
+                <div class="paused-metric-val" id="paused-calories">0</div>
+                <div class="paused-metric-lbl">Calorias (kcal)</div>
+              </div>
+              <div class="paused-metric">
+                <div class="paused-metric-val" id="paused-pace">--:--</div>
+                <div class="paused-metric-lbl">Ritmo médio (min/km)</div>
+              </div>
             </div>
-            <button class="btn-races" id="btn-open-races">
+            <div class="paused-map-area" id="paused-map-area"></div>
+            <div class="paused-actions">
+              <button class="paused-btn paused-btn-stop" id="btn-concluir">CONCLUIR</button>
+              <button class="paused-btn paused-btn-resume" id="btn-resume-paused">RETOMAR</button>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ── PAGE: FEED ── -->
+        <section id="page-feed" class="page">
+          <div class="page-header">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <h2>Feed</h2>
+                <p id="feed-location-label">Carregando localização...</p>
+              </div>
+              <button class="btn-races" id="btn-open-races">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 11l19-9-9 19-2-8-8-2z" />
+                </svg>
+                Próximas<br>Corridas
+              </button>
+            </div>
+          </div>
+          <div id="feed-loading" class="feed-loading">
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+          </div>
+          <div id="feed-content" class="feed-content hidden"></div>
+        </section>
+
+        <!-- ── PAGE: COMUNIDADE ── -->
+        <section id="page-community" class="page">
+          <div class="page-header" style="padding-bottom:8px">
+            <h2>Comunidade</h2>
+          </div>
+          <div class="comm-tabs">
+            <button class="comm-tab active" data-comm="runners">👥 PaceRunners</button>
+            <button class="comm-tab" data-comm="challenges">🔥 Desafios</button>
+            <button class="comm-tab" data-comm="events">🏁 Eventos</button>
+            <button class="comm-tab" data-comm="leaderboard">🏆 Placar</button>
+          </div>
+          <div id="comm-runners" class="comm-section">
+            <div class="search-bar" style="margin:12px 16px">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 11l19-9-9 19-2-8-8-2z" />
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
               </svg>
-              Próximas<br>Corridas
-            </button>
+              <input type="text" id="community-search" placeholder="Buscar usuários..." />
+            </div>
+            <div id="comm-runners-list" class="community-list"></div>
           </div>
-        </div>
-        <div id="feed-loading" class="feed-loading">
-          <div class="skeleton-card"></div>
-          <div class="skeleton-card"></div>
-          <div class="skeleton-card"></div>
-        </div>
-        <div id="feed-content" class="feed-content hidden"></div>
-      </section>
+          <div id="comm-challenges" class="comm-section hidden">
+            <div id="comm-challenges-list" style="padding:12px 16px;display:flex;flex-direction:column;gap:12px"></div>
+          </div>
+          <div id="comm-events" class="comm-section hidden">
+            <div id="comm-events-list" style="padding:12px 16px;display:flex;flex-direction:column;gap:12px"></div>
+          </div>
+          <div id="comm-leaderboard" class="comm-section hidden">
+            <div class="ranking-tabs" style="padding:12px 16px 8px">
+              <button class="leader-tab ranking-tab active" data-leader="distance">Distância</button>
+              <button class="leader-tab ranking-tab" data-leader="runs">Corridas</button>
+              <button class="leader-tab ranking-tab" data-leader="time">Tempo</button>
+            </div>
+            <div id="comm-leaderboard-list" class="ranking-list" style="padding:0 16px"></div>
+          </div>
+        </section>
 
-      <!-- ── PAGE: COMUNIDADE ── -->
-      <section id="page-community" class="page">
-        <div class="page-header" style="padding-bottom:8px">
-          <h2>Comunidade</h2>
+        <!-- ── PAGE: RANKING ── -->
+        <section id="page-ranking" class="page">
+          <div class="page-header">
+            <h2>Ranking</h2>
+            <p>Os melhores da semana</p>
+          </div>
+          <div class="ranking-tabs">
+            <button class="ranking-tab active" data-rank="distance">Distância</button>
+            <button class="ranking-tab" data-rank="pace">Pace</button>
+          </div>
+          <div id="ranking-list" class="ranking-list"></div>
+        </section>
+
+        <!-- ── PAGE: PROGRESSO ── -->
+        <section id="page-progress" class="page">
+          <div class="page-header">
+            <h2>Progresso</h2>
+            <p>Seu histórico completo</p>
+          </div>
+          <div id="progress-summary"></div>
+          <div id="progress-list" class="progress-list" style="padding:0 16px 16px"></div>
+        </section>
+
+        <!-- ── PAGE: PERFIL ── -->
+        <section id="page-profile" class="page">
+          <div class="profile-header">
+            <div class="profile-avatar-wrapper">
+              <img id="profile-avatar" src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=128"
+                alt="avatar" class="profile-avatar-img" />
+              <button class="avatar-edit-btn" id="btn-change-avatar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              </button>
+              <input type="file" id="avatar-file-input" accept="image/*" class="hidden" />
+            </div>
+            <h2 id="profile-name">Carregando...</h2>
+            <p id="profile-email" class="profile-email"></p>
+          </div>
+          <div class="profile-stats-row" id="profile-stats-row"></div>
+          <div class="profile-section">
+            <h3>Configurações</h3>
+            <div class="profile-form">
+              <div class="form-group">
+                <label>Nome de exibição</label>
+                <input type="text" id="profile-name-input" placeholder="Seu nome" />
+              </div>
+              <div class="form-group">
+                <label>Peso (kg) — para cálculo de calorias</label>
+                <input type="number" id="profile-weight" placeholder="70" min="30" max="200" />
+              </div>
+              <button class="btn-primary" id="btn-save-profile">Salvar alterações</button>
+            </div>
+            <button class="btn-outline-danger" id="btn-logout">Sair da conta</button>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- BOTTOM NAV -->
+      <nav class="bottom-nav">
+        <button class="nav-item" data-page="feed">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          <span>Feed</span>
+        </button>
+        <button class="nav-item" data-page="community">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          <span>Comunidade</span>
+        </button>
+        <button class="nav-item nav-center active" data-page="activity">
+          <div class="nav-center-btn">
+            <!-- Boneco correndo -->
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="17" cy="3" r="1.5" />
+              <path
+                d="M10.5 8.5L8 17H10L11.5 12.5L14 15V21H16V13.5L13.5 11L14.5 7.5C15.7 8.9 17.4 9.8 19.5 10V8C17.8 8 16.3 7.1 15.5 5.8L14.5 4.3C14.1 3.7 13.5 3.3 12.8 3.3C12.5 3.3 12.2 3.4 12 3.5L7 5.5V10H9V6.8L10.5 6.2L9.5 10.5L12 13L10.5 8.5Z" />
+            </svg>
+          </div>
+          <span>Atividade</span>
+        </button>
+        <button class="nav-item" data-page="ranking">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg>
+          <span>Ranking</span>
+        </button>
+        <button class="nav-item" data-page="progress">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+          </svg>
+          <span>Progresso</span>
+        </button>
+        <button class="nav-item" id="btn-hamburger" onclick="window.openDrawer()" aria-label="Menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+          <span>Menu</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- CONTROLES FIXOS DE ATIVIDADE (foto durante corrida) -->
+    <div class="activity-controls-fixed" id="activity-controls-fixed">
+      <button class="ctrl-btn secondary" id="btn-photo-activity" title="Adicionar foto">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Próximas Corridas -->
+    <div id="modal-races" class="modal-overlay hidden">
+      <div class="modal-sheet modal-sheet-tall">
+        <div class="modal-handle"></div>
+        <div class="races-header">
+          <div>
+            <h2 class="modal-title" style="margin-bottom:4px">🏁 Próximas Corridas</h2>
+            <p style="font-size:13px;color:var(--text-secondary)">Eventos de corrida e caminhada</p>
+          </div>
+          <button class="btn-ghost" id="btn-close-races" style="padding:8px">✕</button>
         </div>
-        <div class="comm-tabs">
-          <button class="comm-tab active" data-comm="runners">👥 PaceRunners</button>
-          <button class="comm-tab" data-comm="challenges">🔥 Desafios</button>
-          <button class="comm-tab" data-comm="events">🏁 Eventos</button>
-          <button class="comm-tab" data-comm="leaderboard">🏆 Placar</button>
-        </div>
-        <div id="comm-runners" class="comm-section">
-          <div class="search-bar" style="margin:12px 16px">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+
+        <!-- Seletor de cidade -->
+        <div class="races-city-selector">
+          <div class="races-search-bar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.35-4.35" />
             </svg>
-            <input type="text" id="community-search" placeholder="Buscar usuários..." />
-          </div>
-          <div id="comm-runners-list" class="community-list"></div>
-        </div>
-        <div id="comm-challenges" class="comm-section hidden">
-          <div id="comm-challenges-list" style="padding:12px 16px;display:flex;flex-direction:column;gap:12px"></div>
-        </div>
-        <div id="comm-events" class="comm-section hidden">
-          <div id="comm-events-list" style="padding:12px 16px;display:flex;flex-direction:column;gap:12px"></div>
-        </div>
-        <div id="comm-leaderboard" class="comm-section hidden">
-          <div class="ranking-tabs" style="padding:12px 16px 8px">
-            <button class="leader-tab ranking-tab active" data-leader="distance">Distância</button>
-            <button class="leader-tab ranking-tab" data-leader="runs">Corridas</button>
-            <button class="leader-tab ranking-tab" data-leader="time">Tempo</button>
-          </div>
-          <div id="comm-leaderboard-list" class="ranking-list" style="padding:0 16px"></div>
-        </div>
-      </section>
-
-      <!-- ── PAGE: RANKING ── -->
-      <section id="page-ranking" class="page">
-        <div class="page-header">
-          <h2>Ranking</h2>
-          <p>Os melhores da semana</p>
-        </div>
-        <div class="ranking-tabs">
-          <button class="ranking-tab active" data-rank="distance">Distância</button>
-          <button class="ranking-tab" data-rank="pace">Pace</button>
-        </div>
-        <div id="ranking-list" class="ranking-list"></div>
-      </section>
-
-      <!-- ── PAGE: PROGRESSO ── -->
-      <section id="page-progress" class="page">
-        <div class="page-header">
-          <h2>Progresso</h2>
-          <p>Seu histórico completo</p>
-        </div>
-        <div id="progress-summary"></div>
-        <div id="progress-list" class="progress-list" style="padding:0 16px 16px"></div>
-      </section>
-
-      <!-- ── PAGE: PERFIL ── -->
-      <section id="page-profile" class="page">
-        <div class="profile-header">
-          <div class="profile-avatar-wrapper">
-            <img id="profile-avatar" src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=128"
-              alt="avatar" class="profile-avatar-img" />
-            <button class="avatar-edit-btn" id="btn-change-avatar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
+            <input type="text" id="races-city-input" placeholder="Digite a cidade (ex: Guarulhos, São Paulo...)" />
+            <button id="btn-search-races" class="races-search-btn">
+              Buscar
             </button>
-            <input type="file" id="avatar-file-input" accept="image/*" class="hidden" />
           </div>
-          <h2 id="profile-name">Carregando...</h2>
-          <p id="profile-email" class="profile-email"></p>
-        </div>
-        <div class="profile-stats-row" id="profile-stats-row"></div>
-        <div class="profile-section">
-          <h3>Configurações</h3>
-          <div class="profile-form">
-            <div class="form-group">
-              <label>Nome de exibição</label>
-              <input type="text" id="profile-name-input" placeholder="Seu nome" />
-            </div>
-            <div class="form-group">
-              <label>Peso (kg) — para cálculo de calorias</label>
-              <input type="number" id="profile-weight" placeholder="70" min="30" max="200" />
-            </div>
-            <button class="btn-primary" id="btn-save-profile">Salvar alterações</button>
+          <!-- Cidades rápidas -->
+          <div class="races-quick-cities">
+            <button class="city-chip" data-city="Guarulhos">Guarulhos</button>
+            <button class="city-chip" data-city="São Paulo">São Paulo</button>
+            <button class="city-chip" data-city="Campinas">Campinas</button>
+            <button class="city-chip" data-city="Rio de Janeiro">Rio de Janeiro</button>
+            <button class="city-chip" data-city="Belo Horizonte">BH</button>
+            <button class="city-chip" data-city="Curitiba">Curitiba</button>
           </div>
-          <button class="btn-outline-danger" id="btn-logout">Sair da conta</button>
         </div>
-      </section>
 
-    </main>
+        <!-- Resultados -->
+        <div id="races-loading" class="races-loading hidden">
+          <div class="races-spinner"></div>
+          <p>Buscando corridas em <span id="races-loading-city"></span>...</p>
+        </div>
 
-    <!-- BOTTOM NAV -->
-    <nav class="bottom-nav">
-      <button class="nav-item" data-page="feed">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          <polyline points="9 22 9 12 15 12 15 22" />
-        </svg>
-        <span>Feed</span>
-      </button>
-      <button class="nav-item" data-page="community">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-        <span>Comunidade</span>
-      </button>
-      <button class="nav-item nav-center active" data-page="activity">
-        <div class="nav-center-btn">
-          <!-- Boneco correndo -->
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="17" cy="3" r="1.5"/>
-            <path d="M10.5 8.5L8 17H10L11.5 12.5L14 15V21H16V13.5L13.5 11L14.5 7.5C15.7 8.9 17.4 9.8 19.5 10V8C17.8 8 16.3 7.1 15.5 5.8L14.5 4.3C14.1 3.7 13.5 3.3 12.8 3.3C12.5 3.3 12.2 3.4 12 3.5L7 5.5V10H9V6.8L10.5 6.2L9.5 10.5L12 13L10.5 8.5Z"/>
+        <div id="races-empty" class="races-empty hidden">
+          <div style="font-size:48px;margin-bottom:12px">🔍</div>
+          <p>Selecione uma cidade para ver<br>as próximas corridas</p>
+        </div>
+
+        <div id="races-list" class="races-list"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ MENU HAMBURGUER (Drawer lateral) ═══════════════ -->
+    <div id="hamburger-overlay" class="hamburger-overlay hidden"></div>
+    <div id="hamburger-drawer" class="hamburger-drawer hidden">
+      <!-- Header do drawer -->
+      <div class="drawer-header">
+        <div class="drawer-logo">
+          <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
+            <rect width="64" height="64" rx="18" fill="#1A6BF0" />
+            <path d="M18 44 L28 20 L36 34 L42 26 L48 44" stroke="white" stroke-width="3.5" stroke-linecap="round"
+              stroke-linejoin="round" fill="none" />
+            <circle cx="18" cy="44" r="3" fill="#5BFFA0" />
           </svg>
+          <div>
+            <div class="drawer-app-name">PaceRun</div>
+            <div class="drawer-version" id="drawer-version">v1.8.0</div>
+          </div>
         </div>
-        <span>Atividade</span>
-      </button>
-      <button class="nav-item" data-page="ranking">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="20" x2="18" y2="10" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="14" />
-        </svg>
-        <span>Ranking</span>
-      </button>
-      <button class="nav-item" data-page="progress">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-        </svg>
-        <span>Progresso</span>
-      </button>
-      <button class="nav-item" id="btn-hamburger" onclick="window.openDrawer()" aria-label="Menu">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
-        </svg>
-        <span>Menu</span>
-      </button>
-    </nav>
-  </div>
-
-  <!-- CONTROLES FIXOS DE ATIVIDADE (foto durante corrida) -->
-  <div class="activity-controls-fixed" id="activity-controls-fixed">
-    <button class="ctrl-btn secondary" id="btn-photo-activity" title="Adicionar foto">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-        <circle cx="12" cy="13" r="4" />
-      </svg>
-    </button>
-  </div>
-
-  <!-- Modal Próximas Corridas -->
-  <div id="modal-races" class="modal-overlay hidden">
-    <div class="modal-sheet modal-sheet-tall">
-      <div class="modal-handle"></div>
-      <div class="races-header">
-        <div>
-          <h2 class="modal-title" style="margin-bottom:4px">🏁 Próximas Corridas</h2>
-          <p style="font-size:13px;color:var(--text-secondary)">Eventos de corrida e caminhada</p>
-        </div>
-        <button class="btn-ghost" id="btn-close-races" style="padding:8px">✕</button>
+        <button class="drawer-close" id="btn-close-drawer">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
       </div>
 
-      <!-- Seletor de cidade -->
-      <div class="races-city-selector">
-        <div class="races-search-bar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      <!-- Info do usuário -->
+      <div class="drawer-user" id="drawer-user">
+        <img id="drawer-avatar" class="drawer-avatar"
+          src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=64" alt="avatar" />
+        <div>
+          <div class="drawer-user-name" id="drawer-user-name">Atleta</div>
+          <div class="drawer-user-email" id="drawer-user-email"></div>
+        </div>
+      </div>
+
+      <!-- Conta e app -->
+      <div class="drawer-section-title">Conta</div>
+      <nav class="drawer-nav">
+        <button class="drawer-item" data-page="profile">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
           </svg>
-          <input type="text" id="races-city-input" placeholder="Digite a cidade (ex: Guarulhos, São Paulo...)" />
-          <button id="btn-search-races" class="races-search-btn">
-            Buscar
+          Perfil
+        </button>
+        <button class="drawer-item" id="drawer-btn-releases">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          Novidades & Versão
+          <span class="drawer-badge">v1.8.0</span>
+        </button>
+        <button class="drawer-item" id="drawer-btn-notifications">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          Notificações
+          <span class="notif-badge hidden drawer-notif-badge" id="drawer-notif-badge">0</span>
+        </button>
+        <button class="drawer-item" id="drawer-btn-logout">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF4D4D" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <span style="color:#FF4D4D">Sair da conta</span>
+        </button>
+      </nav>
+
+      <!-- Rodapé -->
+      <div class="drawer-footer">
+        <p>PaceRun <span id="drawer-footer-version">v1.8.0</span></p>
+        <p style="margin-top:2px">Feito com ❤️ para corredores</p>
+      </div>
+    </div>
+
+    <!-- ═══════════════ MODAL RELEASES ═══════════════════════════════════ -->
+    <div id="modal-releases" class="modal-overlay hidden">
+      <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+        <div class="modal-handle"></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <div style="font-size:32px">🚀</div>
+          <div>
+            <h2 style="font-family:var(--font-display);font-size:24px;font-weight:800">Novidades</h2>
+            <p style="font-size:13px;color:var(--text-secondary)">Histórico de versões do PaceRun</p>
+          </div>
+        </div>
+
+        <div class="releases-list">
+
+          <!-- v1.8.0 -->
+          <div class="release-item current">
+            <div class="release-header">
+              <span class="release-version">v1.8.0</span>
+              <span class="release-badge current-badge">Atual</span>
+              <span class="release-date">Jun 2026</span>
+            </div>
+            <ul class="release-notes">
+              <li>🔐 Deploy seguro via Netlify — chaves de API fora do repositório</li>
+              <li>🔑 Login com Google — entre com um toque usando sua conta Google</li>
+              <li>👤 Perfil criado automaticamente para novos usuários do Google</li>
+              <li>🌐 App disponível em pacerun.netlify.app</li>
+            </ul>
+          </div>
+
+          <!-- v1.7.0 -->
+          <div class="release-item">
+            <div class="release-header">
+              <span class="release-version">v1.7.0</span>
+              <span class="release-date">Jun 2026</span>
+            </div>
+            <ul class="release-notes">
+              <li>📍 GPS completamente reescrito — distância precisa como apps profissionais</li>
+              <li>🔥 Calorias recalculadas com MET dinâmico baseado no pace real</li>
+              <li>📸 Compartilhamento com foto — WhatsApp envia link da foto junto</li>
+              <li>📱 Instagram: 3 estratégias (Web Share + arquivo, API nativa, fallback)</li>
+              <li>🏃 Botão de Atividade com ícone de corredor na barra de navegação</li>
+              <li>🗑️ Exclusão de atividades do Progresso e da Comunidade</li>
+            </ul>
+          </div>
+
+          <!-- v1.6.0 -->
+          <div class="release-item">
+            <div class="release-header">
+              <span class="release-version">v1.6.0</span>
+              <span class="release-date">Jun 2026</span>
+            </div>
+            <ul class="release-notes">
+              <li>🏃 Tela "INICIAR AO VIVO" — atividade só começa ao tocar o botão</li>
+              <li>👆 Deslize para pausar — gesto intuitivo para pausar a corrida</li>
+              <li>✅ Botões CONCLUIR (vermelho) e RETOMAR (verde) na tela pausada</li>
+              <li>📍 GPS aprimorado — funciona indoor e outdoor sem perder distância</li>
+              <li>📸 Foto da atividade aparece no detalhe e no compartilhamento</li>
+              <li>☰ Menu hamburguer movido para a barra de navegação inferior</li>
+              <li>👥 Comunidade com feed social: curtir ❤️ e comentar 💬 atividades</li>
+              <li>🔔 Notificação automática quando há nova versão disponível</li>
+            </ul>
+          </div>
+          <div class="release-item">
+            <div class="release-header">
+              <span class="release-version">v1.5.0</span>
+              <span class="release-date">Jun 2026</span>
+            </div>
+            <ul class="release-notes">
+              <li>🏁 Eventos de corrida de junho a dezembro 2026 (26 eventos reais)</li>
+              <li>📄 Paginação "Mais Eventos" — carrega 5 por vez</li>
+              <li>⚡ Pace por km — registrado em cada corrida</li>
+              <li>📊 Progresso completo: metas, série, gráfico anual</li>
+              <li>👥 Comunidade com 4 sub-abas: Pacerunners, Desafios, Eventos, Placar</li>
+              <li>☰ Menu hamburguer com acesso a todas as telas</li>
+              <li>📋 Tela de releases (esta tela!)</li>
+            </ul>
+          </div>
+
+          <!-- v1.4.0 -->
+          <div class="release-item">
+            <div class="release-header">
+              <span class="release-version">v1.4.0</span>
+              <span class="release-date">Jun 2026</span>
+            </div>
+            <ul class="release-notes">
+              <li>🔥 Desafios de corrida com progresso real</li>
+              <li>🏆 Placar por distância, corridas e tempo</li>
+              <li>🔄 Recuperação automática de corrida interrompida</li>
+              <li>📱 Ritmo/pace corrigido (sem valores absurdos)</li>
+              <li>🖼️ Foto de perfil atualiza sem cache do browser</li>
+            </ul>
+          </div>
+
+          <!-- v1.3.0 -->
+          <div class="release-item">
+            <div class="release-header">
+              <span class="release-version">v1.3.0</span>
+              <span class="release-date">Jun 2026</span>
+            </div>
+            <ul class="release-notes">
+              <li>🏁 Próximas corridas reais em SP e Guarulhos</li>
+              <li>🔐 "Manter-me conectado" na tela de login</li>
+              <li>🤖 Feed com IA: artigos completos, cache de 6h</li>
+              <li>🔔 Conquistas e notificações da comunidade</li>
+              <li>🗺️ Controles de atividade fixos na tela</li>
+            </ul>
+          </div>
+
+          <!-- v1.2.0 -->
+          <div class="release-item">
+            <div class="release-header">
+              <span class="release-version">v1.2.0</span>
+              <span class="release-date">Jun 2026</span>
+            </div>
+            <ul class="release-notes">
+              <li>📸 Foto de perfil via Cloudinary (gratuito)</li>
+              <li>🧭 Navegação corrigida entre todas as telas</li>
+              <li>💾 Histórico de atividades no Progresso</li>
+              <li>🔗 Compartilhamento WhatsApp, Instagram, Facebook</li>
+              <li>👥 Comunidade excluindo o próprio usuário</li>
+            </ul>
+          </div>
+
+          <!-- v1.1.0 -->
+          <div class="release-item">
+            <div class="release-header">
+              <span class="release-version">v1.1.0</span>
+              <span class="release-date">Jun 2026</span>
+            </div>
+            <ul class="release-notes">
+              <li>📰 Feed de notícias gerado por IA por localização</li>
+              <li>🏆 Ranking por distância e pace</li>
+              <li>✉️ Cadastro via link no e-mail</li>
+              <li>🗺️ Mapa ao vivo com rota desenhada (Leaflet)</li>
+              <li>📊 Tela de progresso com totais acumulados</li>
+            </ul>
+          </div>
+
+          <!-- v1.0.0 -->
+          <div class="release-item">
+            <div class="release-header">
+              <span class="release-version">v1.0.0</span>
+              <span class="release-date">Jun 2026</span>
+            </div>
+            <ul class="release-notes">
+              <li>🚀 Lançamento do PaceRun</li>
+              <li>🔐 Autenticação com Firebase</li>
+              <li>📍 Rastreamento GPS em tempo real</li>
+              <li>⏱️ Distância, duração, ritmo e calorias</li>
+              <li>📱 PWA instalável sem App Store</li>
+            </ul>
+          </div>
+
+        </div>
+
+        <button class="btn-ghost" id="btn-close-releases" style="margin-top:20px">Fechar</button>
+      </div>
+    </div>
+
+    <!-- Modal Notificações -->
+    <div id="modal-notifications" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+          <h2 style="font-family:var(--font-display);font-size:24px;font-weight:800">Notificações</h2>
+          <button class="btn-ghost" id="btn-mark-all-read" style="font-size:13px;color:var(--blue-300)">Marcar
+            lidas</button>
+        </div>
+        <div id="notifications-list"></div>
+        <button class="btn-ghost" id="btn-close-notifications" style="margin-top:16px">Fechar</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ MODALS -->
+
+    <!-- Activity Summary Modal -->
+    <div id="modal-summary" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title">Atividade concluída! 🎉</h2>
+        <div class="summary-stats" id="summary-stats"></div>
+        <div class="summary-photo-section">
+          <button class="btn-outline" id="btn-add-photo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+            Adicionar foto
+          </button>
+          <img id="summary-photo-preview" class="summary-photo-preview hidden" alt="foto atividade" />
+          <input type="file" id="activity-photo-input" accept="image/*" class="hidden" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" id="btn-save-activity">Salvar atividade</button>
+          <button class="btn-ghost" id="btn-share-activity">Compartilhar</button>
+          <button class="btn-ghost btn-danger" id="btn-discard-activity">Descartar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="modal-share" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title">Compartilhar atividade</h2>
+        <div class="share-preview" id="share-preview"></div>
+        <div class="share-options">
+          <button class="share-btn" id="share-instagram">
+            <div class="share-icon instagram-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                <path
+                  d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+              </svg>
+            </div>
+            <span>Instagram Stories</span>
+          </button>
+          <button class="share-btn" id="share-facebook">
+            <div class="share-icon facebook-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                <path
+                  d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+              </svg>
+            </div>
+            <span>Facebook Stories</span>
+          </button>
+          <button class="share-btn" id="share-whatsapp">
+            <div class="share-icon whatsapp-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                <path
+                  d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+              </svg>
+            </div>
+            <span>WhatsApp</span>
+          </button>
+          <button class="share-btn" id="share-other">
+            <div class="share-icon other-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+              </svg>
+            </div>
+            <span>Outros</span>
           </button>
         </div>
-        <!-- Cidades rápidas -->
-        <div class="races-quick-cities">
-          <button class="city-chip" data-city="Guarulhos">Guarulhos</button>
-          <button class="city-chip" data-city="São Paulo">São Paulo</button>
-          <button class="city-chip" data-city="Campinas">Campinas</button>
-          <button class="city-chip" data-city="Rio de Janeiro">Rio de Janeiro</button>
-          <button class="city-chip" data-city="Belo Horizonte">BH</button>
-          <button class="city-chip" data-city="Curitiba">Curitiba</button>
-        </div>
-      </div>
-
-      <!-- Resultados -->
-      <div id="races-loading" class="races-loading hidden">
-        <div class="races-spinner"></div>
-        <p>Buscando corridas em <span id="races-loading-city"></span>...</p>
-      </div>
-
-      <div id="races-empty" class="races-empty hidden">
-        <div style="font-size:48px;margin-bottom:12px">🔍</div>
-        <p>Selecione uma cidade para ver<br>as próximas corridas</p>
-      </div>
-
-      <div id="races-list" class="races-list"></div>
-    </div>
-  </div>
-
-  <!-- ═══════════════ MENU HAMBURGUER (Drawer lateral) ═══════════════ -->
-  <div id="hamburger-overlay" class="hamburger-overlay hidden"></div>
-  <div id="hamburger-drawer" class="hamburger-drawer hidden">
-    <!-- Header do drawer -->
-    <div class="drawer-header">
-      <div class="drawer-logo">
-        <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
-          <rect width="64" height="64" rx="18" fill="#1A6BF0" />
-          <path d="M18 44 L28 20 L36 34 L42 26 L48 44" stroke="white" stroke-width="3.5" stroke-linecap="round"
-            stroke-linejoin="round" fill="none" />
-          <circle cx="18" cy="44" r="3" fill="#5BFFA0" />
-        </svg>
-        <div>
-          <div class="drawer-app-name">PaceRun</div>
-          <div class="drawer-version" id="drawer-version">v1.7.0</div>
-        </div>
-      </div>
-      <button class="drawer-close" id="btn-close-drawer">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-          stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- Info do usuário -->
-    <div class="drawer-user" id="drawer-user">
-      <img id="drawer-avatar" class="drawer-avatar"
-        src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=64" alt="avatar" />
-      <div>
-        <div class="drawer-user-name" id="drawer-user-name">Atleta</div>
-        <div class="drawer-user-email" id="drawer-user-email"></div>
+        <button class="btn-ghost" id="btn-close-share">Fechar</button>
       </div>
     </div>
 
-    <!-- Conta e app -->
-    <div class="drawer-section-title">Conta</div>
-    <nav class="drawer-nav">
-      <button class="drawer-item" data-page="profile">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
-        Perfil
-      </button>
-      <button class="drawer-item" id="drawer-btn-releases">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="8" x2="12" y2="12" />
-          <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
-        Novidades & Versão
-        <span class="drawer-badge">v1.7.0</span>
-      </button>
-      <button class="drawer-item" id="drawer-btn-notifications">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
-        Notificações
-        <span class="notif-badge hidden drawer-notif-badge" id="drawer-notif-badge">0</span>
-      </button>
-      <button class="drawer-item" id="drawer-btn-logout">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF4D4D" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-          <polyline points="16 17 21 12 16 7" />
-          <line x1="21" y1="12" x2="9" y2="12" />
-        </svg>
-        <span style="color:#FF4D4D">Sair da conta</span>
-      </button>
-    </nav>
-
-    <!-- Rodapé -->
-    <div class="drawer-footer">
-      <p>PaceRun <span id="drawer-footer-version">v1.7.0</span></p>
-      <p style="margin-top:2px">Feito com ❤️ para corredores</p>
-    </div>
-  </div>
-
-  <!-- ═══════════════ MODAL RELEASES ═══════════════════════════════════ -->
-  <div id="modal-releases" class="modal-overlay hidden">
-    <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
-      <div class="modal-handle"></div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-        <div style="font-size:32px">🚀</div>
-        <div>
-          <h2 style="font-family:var(--font-display);font-size:24px;font-weight:800">Novidades</h2>
-          <p style="font-size:13px;color:var(--text-secondary)">Histórico de versões do PaceRun</p>
-        </div>
-      </div>
-
-      <div class="releases-list">
-
-        <!-- v1.7.0 -->
-        <div class="release-item current">
-          <div class="release-header">
-            <span class="release-version">v1.7.0</span>
-            <span class="release-badge current-badge">Atual</span>
-            <span class="release-date">Jun 2026</span>
-          </div>
-          <ul class="release-notes">
-            <li>📍 GPS completamente reescrito — distância precisa como apps profissionais</li>
-            <li>🔥 Calorias recalculadas com MET dinâmico baseado no pace real</li>
-            <li>📸 Compartilhamento com foto — WhatsApp envia link da foto junto</li>
-            <li>📱 Instagram: 3 estratégias (Web Share + arquivo, API nativa, fallback)</li>
-            <li>🏃 Botão de Atividade com ícone de corredor na barra de navegação</li>
-            <li>🗑️ Exclusão de atividades do Progresso e da Comunidade</li>
-          </ul>
-        </div>
-
-        <!-- v1.6.0 -->
-        <div class="release-item">
-          <div class="release-header">
-            <span class="release-version">v1.6.0</span>
-            <span class="release-date">Jun 2026</span>
-          </div>
-          <ul class="release-notes">
-            <li>🏃 Tela "INICIAR AO VIVO" — atividade só começa ao tocar o botão</li>
-            <li>👆 Deslize para pausar — gesto intuitivo para pausar a corrida</li>
-            <li>✅ Botões CONCLUIR (vermelho) e RETOMAR (verde) na tela pausada</li>
-            <li>📍 GPS aprimorado — funciona indoor e outdoor sem perder distância</li>
-            <li>📸 Foto da atividade aparece no detalhe e no compartilhamento</li>
-            <li>☰ Menu hamburguer movido para a barra de navegação inferior</li>
-            <li>👥 Comunidade com feed social: curtir ❤️ e comentar 💬 atividades</li>
-            <li>🔔 Notificação automática quando há nova versão disponível</li>
-          </ul>
-        </div>
-        <div class="release-item">
-          <div class="release-header">
-            <span class="release-version">v1.5.0</span>
-            <span class="release-date">Jun 2026</span>
-          </div>
-          <ul class="release-notes">
-            <li>🏁 Eventos de corrida de junho a dezembro 2026 (26 eventos reais)</li>
-            <li>📄 Paginação "Mais Eventos" — carrega 5 por vez</li>
-            <li>⚡ Pace por km — registrado em cada corrida</li>
-            <li>📊 Progresso completo: metas, série, gráfico anual</li>
-            <li>👥 Comunidade com 4 sub-abas: Pacerunners, Desafios, Eventos, Placar</li>
-            <li>☰ Menu hamburguer com acesso a todas as telas</li>
-            <li>📋 Tela de releases (esta tela!)</li>
-          </ul>
-        </div>
-
-        <!-- v1.4.0 -->
-        <div class="release-item">
-          <div class="release-header">
-            <span class="release-version">v1.4.0</span>
-            <span class="release-date">Jun 2026</span>
-          </div>
-          <ul class="release-notes">
-            <li>🔥 Desafios de corrida com progresso real</li>
-            <li>🏆 Placar por distância, corridas e tempo</li>
-            <li>🔄 Recuperação automática de corrida interrompida</li>
-            <li>📱 Ritmo/pace corrigido (sem valores absurdos)</li>
-            <li>🖼️ Foto de perfil atualiza sem cache do browser</li>
-          </ul>
-        </div>
-
-        <!-- v1.3.0 -->
-        <div class="release-item">
-          <div class="release-header">
-            <span class="release-version">v1.3.0</span>
-            <span class="release-date">Jun 2026</span>
-          </div>
-          <ul class="release-notes">
-            <li>🏁 Próximas corridas reais em SP e Guarulhos</li>
-            <li>🔐 "Manter-me conectado" na tela de login</li>
-            <li>🤖 Feed com IA: artigos completos, cache de 6h</li>
-            <li>🔔 Conquistas e notificações da comunidade</li>
-            <li>🗺️ Controles de atividade fixos na tela</li>
-          </ul>
-        </div>
-
-        <!-- v1.2.0 -->
-        <div class="release-item">
-          <div class="release-header">
-            <span class="release-version">v1.2.0</span>
-            <span class="release-date">Jun 2026</span>
-          </div>
-          <ul class="release-notes">
-            <li>📸 Foto de perfil via Cloudinary (gratuito)</li>
-            <li>🧭 Navegação corrigida entre todas as telas</li>
-            <li>💾 Histórico de atividades no Progresso</li>
-            <li>🔗 Compartilhamento WhatsApp, Instagram, Facebook</li>
-            <li>👥 Comunidade excluindo o próprio usuário</li>
-          </ul>
-        </div>
-
-        <!-- v1.1.0 -->
-        <div class="release-item">
-          <div class="release-header">
-            <span class="release-version">v1.1.0</span>
-            <span class="release-date">Jun 2026</span>
-          </div>
-          <ul class="release-notes">
-            <li>📰 Feed de notícias gerado por IA por localização</li>
-            <li>🏆 Ranking por distância e pace</li>
-            <li>✉️ Cadastro via link no e-mail</li>
-            <li>🗺️ Mapa ao vivo com rota desenhada (Leaflet)</li>
-            <li>📊 Tela de progresso com totais acumulados</li>
-          </ul>
-        </div>
-
-        <!-- v1.0.0 -->
-        <div class="release-item">
-          <div class="release-header">
-            <span class="release-version">v1.0.0</span>
-            <span class="release-date">Jun 2026</span>
-          </div>
-          <ul class="release-notes">
-            <li>🚀 Lançamento do PaceRun</li>
-            <li>🔐 Autenticação com Firebase</li>
-            <li>📍 Rastreamento GPS em tempo real</li>
-            <li>⏱️ Distância, duração, ritmo e calorias</li>
-            <li>📱 PWA instalável sem App Store</li>
-          </ul>
-        </div>
-
-      </div>
-
-      <button class="btn-ghost" id="btn-close-releases" style="margin-top:20px">Fechar</button>
-    </div>
-  </div>
-
-  <!-- Modal Notificações -->
-  <div id="modal-notifications" class="modal-overlay hidden">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <h2 style="font-family:var(--font-display);font-size:24px;font-weight:800">Notificações</h2>
-        <button class="btn-ghost" id="btn-mark-all-read" style="font-size:13px;color:var(--blue-300)">Marcar
-          lidas</button>
-      </div>
-      <div id="notifications-list"></div>
-      <button class="btn-ghost" id="btn-close-notifications" style="margin-top:16px">Fechar</button>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════ MODALS -->
-
-  <!-- Activity Summary Modal -->
-  <div id="modal-summary" class="modal-overlay hidden">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <h2 class="modal-title">Atividade concluída! 🎉</h2>
-      <div class="summary-stats" id="summary-stats"></div>
-      <div class="summary-photo-section">
-        <button class="btn-outline" id="btn-add-photo">
+    <!-- Activity Detail Modal -->
+    <div id="modal-activity-detail" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div id="activity-detail-content"></div>
+        <button class="btn-primary" id="btn-share-from-detail">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-            <circle cx="12" cy="13" r="4" />
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
           </svg>
-          Adicionar foto
+          Compartilhar
         </button>
-        <img id="summary-photo-preview" class="summary-photo-preview hidden" alt="foto atividade" />
-        <input type="file" id="activity-photo-input" accept="image/*" class="hidden" />
-      </div>
-      <div class="modal-actions">
-        <button class="btn-primary" id="btn-save-activity">Salvar atividade</button>
-        <button class="btn-ghost" id="btn-share-activity">Compartilhar</button>
-        <button class="btn-ghost btn-danger" id="btn-discard-activity">Descartar</button>
+        <button class="btn-ghost" id="btn-close-detail">Fechar</button>
       </div>
     </div>
-  </div>
 
-  <!-- Share Modal -->
-  <div id="modal-share" class="modal-overlay hidden">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <h2 class="modal-title">Compartilhar atividade</h2>
-      <div class="share-preview" id="share-preview"></div>
-      <div class="share-options">
-        <button class="share-btn" id="share-instagram">
-          <div class="share-icon instagram-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-              <path
-                d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-            </svg>
-          </div>
-          <span>Instagram Stories</span>
-        </button>
-        <button class="share-btn" id="share-facebook">
-          <div class="share-icon facebook-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-              <path
-                d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-            </svg>
-          </div>
-          <span>Facebook Stories</span>
-        </button>
-        <button class="share-btn" id="share-whatsapp">
-          <div class="share-icon whatsapp-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-              <path
-                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-            </svg>
-          </div>
-          <span>WhatsApp</span>
-        </button>
-        <button class="share-btn" id="share-other">
-          <div class="share-icon other-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="18" cy="5" r="3" />
-              <circle cx="6" cy="12" r="3" />
-              <circle cx="18" cy="19" r="3" />
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-            </svg>
-          </div>
-          <span>Outros</span>
-        </button>
-      </div>
-      <button class="btn-ghost" id="btn-close-share">Fechar</button>
-    </div>
-  </div>
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
 
-  <!-- Activity Detail Modal -->
-  <div id="modal-activity-detail" class="modal-overlay hidden">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div id="activity-detail-content"></div>
-      <button class="btn-primary" id="btn-share-from-detail">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="18" cy="5" r="3" />
-          <circle cx="6" cy="12" r="3" />
-          <circle cx="18" cy="19" r="3" />
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-        </svg>
-        Compartilhar
-      </button>
-      <button class="btn-ghost" id="btn-close-detail">Fechar</button>
-    </div>
-  </div>
+    <!-- Leaflet Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Toast -->
-  <div id="toast" class="toast hidden"></div>
-
-  <!-- Leaflet Map -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- App Scripts -->
-  <script src="js/app.js"></script>
+    <!-- App Scripts -->
+    <script src="js/app.js"></script>
 </body>
 
 </html>
