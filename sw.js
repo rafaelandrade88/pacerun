@@ -1,16 +1,16 @@
 /* ═══════════════════════════════════════════════════
-   PACERUN — Service Worker v1.7.0
+   PACERUN — Service Worker v1.8.1
    ═══════════════════════════════════════════════════ */
 
-const APP_VERSION = 'v1.7.0';
+const APP_VERSION = 'v1.8.1';
 const CACHE_NAME = `pacerun-${APP_VERSION}`;
 
 const PRECACHE = [
-  '/pacerun/',
-  '/pacerun/index.html',
-  '/pacerun/css/app.css',
-  '/pacerun/js/app.js',
-  '/pacerun/manifest.json',
+  '/',
+  '/index.html',
+  '/css/app.css',
+  '/js/app.js',
+  '/manifest.json',
 ];
 
 // Install: pré-cache dos assets
@@ -25,12 +25,12 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
-      console.log('[SW v1.7.0] Caches encontrados:', keys);
+      console.log('[SW v1.8.1] Caches encontrados:', keys);
       return Promise.all(
         keys
           .filter(k => k !== CACHE_NAME) // deleta tudo exceto o atual
           .map(k => {
-            console.log('[SW v1.7.0] Deletando cache antigo:', k);
+            console.log('[SW v1.8.1] Deletando cache antigo:', k);
             return caches.delete(k);
           })
       );
@@ -74,7 +74,7 @@ self.addEventListener('fetch', event => {
         return caches.match(event.request).then(cached => {
           if (cached) return cached;
           if (event.request.mode === 'navigate') {
-            return caches.match('/pacerun/index.html');
+            return caches.match('/index.html');
           }
         });
       })
