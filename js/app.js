@@ -276,7 +276,7 @@ function setupAuth() {
     // URL que o Firebase vai redirecionar após o clique no e-mail
     // Deve ser a URL exata do seu app no GitHub Pages
     const actionCodeSettings = {
-      url: 'https://rafaelandrade88.github.io/pacerun/',
+      url: 'https://pacerun.netlify.app/',
       handleCodeInApp: true,
     };
 
@@ -323,7 +323,7 @@ async function checkEmailLink() {
     window.localStorage.removeItem('pacerun_email_for_link');
 
     // Limpa a URL para não reutilizar o link
-    window.history.replaceState(null, '', '/pacerun/');
+    window.history.replaceState(null, '', '/');
 
     // Verifica se o perfil já existe (re-abertura do link)
     const snap = await getDoc(doc(db, 'users', result.user.uid));
@@ -3204,6 +3204,6 @@ function updateDrawerNotifBadge() {
 // ── PWA Service Worker Registration ───────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/pacerun/sw.js').catch(e => console.warn('SW:', e));
+    navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW:', e));
   });
 }
