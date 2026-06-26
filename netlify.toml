@@ -1,19 +1,10 @@
 # PaceRun — Netlify config
-# O build roda LOCALMENTE (node build.js no seu PC).
-# O Netlify só publica o dist/ já pronto — zero créditos de build.
+# Build roda LOCALMENTE (node build.js no PC).
+# Netlify só publica o dist/ — zero créditos de build.
 
 [build]
-  # Sem comando de build — Netlify só publica o dist/
   command = ""
   publish = "dist"
-
-# Headers de segurança
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options        = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy        = "strict-origin-when-cross-origin"
 
 # Service Worker sem cache
 [[headers]]
@@ -21,3 +12,11 @@
   [headers.values]
     Cache-Control          = "no-cache"
     Service-Worker-Allowed = "/"
+
+# Headers de segurança — SEM X-Frame-Options
+# (bloqueava o popup de login do Google)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
