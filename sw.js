@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════
-   PACERUN — Service Worker v1.8.1
+   PACERUN — Service Worker v1.8.2
    ═══════════════════════════════════════════════════ */
 
-const APP_VERSION = 'v1.8.1';
+const APP_VERSION = 'v1.8.2';
 const CACHE_NAME = `pacerun-${APP_VERSION}`;
 
 const PRECACHE = [
@@ -25,12 +25,12 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
-      console.log('[SW v1.8.1] Caches encontrados:', keys);
+      console.log('[SW v1.8.2] Caches encontrados:', keys);
       return Promise.all(
         keys
           .filter(k => k !== CACHE_NAME) // deleta tudo exceto o atual
           .map(k => {
-            console.log('[SW v1.8.1] Deletando cache antigo:', k);
+            console.log('[SW v1.8.2] Deletando cache antigo:', k);
             return caches.delete(k);
           })
       );
@@ -42,6 +42,9 @@ self.addEventListener('activate', event => {
 // Fetch: network-first para garantir sempre versão atualizada
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+
+  // Ignora schemes não cacheáveis (chrome-extension, data, blob, etc.)
+  if (!url.protocol.startsWith('http')) return;
 
   // Não intercepta APIs externas
   if (
@@ -67,7 +70,9 @@ self.addEventListener('fetch', event => {
       .then(response => {
         if (!response || response.status !== 200) return response;
         const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        if (url.protocol.startsWith('http')) {
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
         return response;
       })
       .catch(() => {
