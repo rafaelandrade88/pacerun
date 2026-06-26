@@ -1,18 +1,17 @@
-# ─── Variáveis de ambiente (NUNCA commitar) ───────────────
+# ── NUNCA commitar — contém chaves de API ──────────────
 .env
 .env.local
-.env.production
 .env*.local
 
-# ─── Pasta de build (gerada pelo Netlify, não vai pro git) ─
-dist/
-
-# ─── Node ─────────────────────────────────────────────────
+# ── Node ───────────────────────────────────────────────
 node_modules/
 npm-debug.log*
 
-# ─── macOS ────────────────────────────────────────────────
+# ── macOS ──────────────────────────────────────────────
 .DS_Store
 
-# ─── VS Code ──────────────────────────────────────────────
+# ── VS Code ────────────────────────────────────────────
 .vscode/
+
+# NOTA: dist/ NÃO está aqui — ela DEVE subir pro git
+# pois é o que o Netlify publica
