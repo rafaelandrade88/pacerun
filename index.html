@@ -25,21 +25,15 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    // Firebase Storage removido — usando Cloudinary (gratuito, sem cartão)
 
-    // ── CONFIGURE YOUR FIREBASE PROJECT HERE ──────────────────────────────
-    // 1. Acesse https://console.firebase.google.com
-    // 2. Crie um projeto e clique em "Adicionar app Web"
-    // 3. Substitua os valores abaixo pelos do seu projeto
     const firebaseConfig = {
-      apiKey: "%%FIREBASE_API_KEY%%",
-      authDomain: "%%FIREBASE_AUTH_DOMAIN%%",
-      projectId: "%%FIREBASE_PROJECT_ID%%",
-      storageBucket: "%%FIREBASE_STORAGE_BUCKET%%",
-      messagingSenderId: "%%FIREBASE_MESSAGING_SENDER_ID%%",
-      appId: "1:%%FIREBASE_APP_ID%%"
-    };
-    // ── FIM DA CONFIGURAÇÃO ────────────────────────────────────────────────
+  apiKey: "AIzaSyAMVtjO77iIzb8RxuZ4vUNgljxFATD6P1k",
+  authDomain: "pacerun-16dda.firebaseapp.com",
+  projectId: "pacerun-16dda",
+  storageBucket: "pacerun-16dda.firebasestorage.app",
+  messagingSenderId: "637460926424",
+  appId: "1:637460926424:web:0dfddfb2e7b2fa406a2cad"
+};
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
