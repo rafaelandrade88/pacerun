@@ -25,21 +25,15 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, onAuthStateChanged, signOut, updateProfile, updatePassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, EmailAuthProvider, linkWithCredential, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    // Firebase Storage removido — usando Cloudinary (gratuito, sem cartão)
 
-    // ── CONFIGURE YOUR FIREBASE PROJECT HERE ──────────────────────────────
-    // 1. Acesse https://console.firebase.google.com
-    // 2. Crie um projeto e clique em "Adicionar app Web"
-    // 3. Substitua os valores abaixo pelos do seu projeto
     const firebaseConfig = {
-      apiKey: "AIzaSyAMVtjO77iIzb8RxuZ4vUNgljxFATD6P1k",
-      authDomain: "pacerun-16dda.firebaseapp.com",
-      projectId: "pacerun-16dda",
-      storageBucket: "pacerun-16dda.firebasestorage.app",
-      messagingSenderId: "637460926424",
-      appId: "1:1:637460926424:web:0dfddfb2e7b2fa406a2cad"
-    };
-    // ── FIM DA CONFIGURAÇÃO ────────────────────────────────────────────────
+  apiKey: "AIzaSyAMVtjO77iIzb8RxuZ4vUNgljxFATD6P1k",
+  authDomain: "pacerun-16dda.firebaseapp.com",
+  projectId: "pacerun-16dda",
+  storageBucket: "pacerun-16dda.firebasestorage.app",
+  messagingSenderId: "637460926424",
+  appId: "1:637460926424:web:0dfddfb2e7b2fa406a2cad"
+};
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -88,11 +82,11 @@
       </div>
       <div class="auth-form">
         <div class="form-group">
-          <label>E-mail</label>
+          <label for="login-email">E-mail</label>
           <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email" />
         </div>
         <div class="form-group">
-          <label>Senha</label>
+          <label for="login-password">Senha</label>
           <input type="password" id="login-password" placeholder="Digite sua senha" autocomplete="off" autocorrect="off"
             autocapitalize="off" spellcheck="false" />
         </div>
@@ -144,7 +138,7 @@
         </div>
         <div class="auth-form">
           <div class="form-group">
-            <label>Seu e-mail</label>
+            <label for="reg-email">Seu e-mail</label>
             <input type="email" id="reg-email" placeholder="seu@email.com" autocomplete="email" />
           </div>
           <button class="btn-primary" id="btn-send-link">Enviar link de acesso</button>
@@ -164,16 +158,16 @@
         </div>
         <div class="auth-form">
           <div class="form-group">
-            <label>Seu nome</label>
+            <label for="complete-name">Seu nome</label>
             <input type="text" id="complete-name" placeholder="Como quer ser chamado?" autocomplete="name" />
           </div>
           <div class="form-group">
-            <label>Crie uma senha</label>
+            <label for="complete-password">Crie uma senha</label>
             <input type="password" id="complete-password" placeholder="mínimo 6 caracteres"
               autocomplete="new-password" />
           </div>
           <div class="form-group">
-            <label>Confirmar senha</label>
+            <label for="complete-password2">Confirmar senha</label>
             <input type="password" id="complete-password2" placeholder="repita a senha" autocomplete="new-password" />
           </div>
           <button class="btn-primary" id="btn-complete-register">Criar minha conta</button>
@@ -189,7 +183,7 @@
       <!-- TOP HEADER -->
       <header class="app-header" id="app-header">
         <div class="header-left">
-          <img id="header-avatar" class="header-avatar" style="cursor:pointer" onclick="openDrawer()"
+          <img id="header-avatar" class="header-avatar" style="cursor:pointer" onclick="openDrawer()" role="button" aria-label="Abrir menu"
             src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=64" alt="avatar" />
           <div>
             <p class="header-greeting">Bom dia,</p>
@@ -197,7 +191,7 @@
           </div>
         </div>
         <div class="header-right">
-          <button class="icon-btn notif-btn" id="btn-notifications">
+          <button class="icon-btn notif-btn" id="btn-notifications" aria-label="Notificações">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -417,11 +411,11 @@
             <h3>Configurações</h3>
             <div class="profile-form">
               <div class="form-group">
-                <label>Nome de exibição</label>
+                <label for="profile-name-input">Nome de exibição</label>
                 <input type="text" id="profile-name-input" placeholder="Seu nome" />
               </div>
               <div class="form-group">
-                <label>Peso (kg) — para cálculo de calorias</label>
+                <label for="profile-weight">Peso (kg) — para cálculo de calorias</label>
                 <input type="number" id="profile-weight" placeholder="70" min="30" max="200" />
               </div>
               <button class="btn-primary" id="btn-save-profile">Salvar alterações</button>
@@ -571,7 +565,7 @@
             <div class="drawer-version" id="drawer-version">v1.8.0</div>
           </div>
         </div>
-        <button class="drawer-close" id="btn-close-drawer">
+        <button class="drawer-close" id="btn-close-drawer" aria-label="Fechar menu">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
             stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18" />
