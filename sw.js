@@ -1,16 +1,19 @@
 /* ═══════════════════════════════════════════════════
-   PACERUN — Service Worker v1.8.4
+   PACERUN — Service Worker v1.8.5
    ═══════════════════════════════════════════════════ */
 
-const APP_VERSION = 'v1.8.4';
+const APP_VERSION = 'v1.8.5';
 const CACHE_NAME = `pacerun-${APP_VERSION}`;
 
+// Detecta o base path automaticamente (funciona em / e em /pacerun/)
+const BASE = self.registration.scope; // ex: https://host/pacerun/
+
 const PRECACHE = [
-  '/',
-  '/index.html',
-  '/css/app.css',
-  '/js/app.js',
-  '/manifest.json',
+  BASE,
+  BASE + 'index.html',
+  BASE + 'css/app.css',
+  BASE + 'js/app.js',
+  BASE + 'manifest.json',
 ];
 
 // Install: pré-cache dos assets
@@ -61,8 +64,6 @@ self.addEventListener('fetch', event => {
       .then(response => {
         if (!response || response.status !== 200) return response;
         const clone = response.clone();
-        // .catch(() => {}) garante que qualquer falha no cache nunca
-        // vai lançar um erro não tratado nem quebrar a resposta ao usuário
         caches.open(CACHE_NAME)
           .then(cache => cache.put(request, clone))
           .catch(() => {});
@@ -70,7 +71,7 @@ self.addEventListener('fetch', event => {
       })
       .catch(() =>
         caches.match(request).then(cached =>
-          cached || (request.mode === 'navigate' ? caches.match('/index.html') : undefined)
+          cached || (request.mode === 'navigate' ? caches.match(BASE + 'index.html') : undefined)
         )
       )
   );
