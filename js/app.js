@@ -107,9 +107,10 @@ async function handleAuthChange(user) {
       _appSetupDone = true;
       setupApp();
     } else {
-      // Re-login: só atualiza o header
+      // Re-login: atualiza header e garante que uma página esteja ativa
       updateHeaderUI();
       loadProfileData();
+      navigateTo(State.currentPage || 'activity');
     }
   } else {
     _appSetupDone = false;
