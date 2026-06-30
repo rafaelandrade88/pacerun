@@ -29,13 +29,13 @@
     import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, addDoc, getDocs, query, orderBy, limit, where, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
-  apiKey: "AIzaSyAMVtjO77iIzb8RxuZ4vUNgljxFATD6P1k",
-  authDomain: "pacerun-16dda.firebaseapp.com",
-  projectId: "pacerun-16dda",
-  storageBucket: "pacerun-16dda.firebasestorage.app",
-  messagingSenderId: "637460926424",
-  appId: "1:637460926424:web:0dfddfb2e7b2fa406a2cad"
-};
+      apiKey: "%%FIREBASE_API_KEY%%",
+      authDomain: "%%FIREBASE_AUTH_DOMAIN%%",
+      projectId: "%%FIREBASE_PROJECT_ID%%",
+      storageBucket: "%%FIREBASE_STORAGE_BUCKET%%",
+      messagingSenderId: "%%FIREBASE_MESSAGING_SENDER_ID%%",
+      appId: "1:%%FIREBASE_APP_ID%%"
+    };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -185,8 +185,9 @@
       <!-- TOP HEADER -->
       <header class="app-header" id="app-header">
         <div class="header-left">
-          <img id="header-avatar" class="header-avatar" style="cursor:pointer" onclick="openDrawer()" role="button" aria-label="Abrir menu"
-            src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=64" alt="avatar" />
+          <img id="header-avatar" class="header-avatar" style="cursor:pointer" onclick="openDrawer()" role="button"
+            aria-label="Abrir menu" src="https://ui-avatars.com/api/?name=U&background=1A6BF0&color=fff&size=64"
+            alt="avatar" />
           <div>
             <p class="header-greeting">Bom dia,</p>
             <p class="header-name" id="header-name">Atleta</p>
@@ -403,7 +404,8 @@
                   <circle cx="12" cy="13" r="4" />
                 </svg>
               </button>
-              <input type="file" id="avatar-file-input" accept="image/*" class="hidden" aria-label="Selecionar foto de perfil" />
+              <input type="file" id="avatar-file-input" accept="image/*" class="hidden"
+                aria-label="Selecionar foto de perfil" />
             </div>
             <h2 id="profile-name">Carregando...</h2>
             <p id="profile-email" class="profile-email"></p>
@@ -519,7 +521,8 @@
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.35-4.35" />
             </svg>
-            <input type="text" id="races-city-input" placeholder="Digite a cidade (ex: Guarulhos, São Paulo...)" aria-label="Buscar corridas por cidade" />
+            <input type="text" id="races-city-input" placeholder="Digite a cidade (ex: Guarulhos, São Paulo...)"
+              aria-label="Buscar corridas por cidade" />
             <button id="btn-search-races" class="races-search-btn">
               Buscar
             </button>
@@ -825,7 +828,8 @@
             Adicionar foto
           </button>
           <img id="summary-photo-preview" class="summary-photo-preview hidden" alt="foto atividade" />
-          <input type="file" id="activity-photo-input" accept="image/*" class="hidden" aria-label="Adicionar foto da atividade" />
+          <input type="file" id="activity-photo-input" accept="image/*" class="hidden"
+            aria-label="Adicionar foto da atividade" />
         </div>
         <div class="modal-actions">
           <button class="btn-primary" id="btn-save-activity">Salvar atividade</button>
