@@ -89,17 +89,41 @@ async function handleAuthChange(user) {
     State.user = user;
     await loadUserProfile(user.uid);
 
-    // Bloqueia acesso se o perfil não foi completado (cadastro via link pendente)
+    // Se perfil incompleto mas usuário tem displayName (login Google ou social),
+    // cria o perfil automaticamente sem redirecionar para tela de completion
     const profileComplete = State.userProfile?.name && State.userProfile.name.trim() !== '';
     if (!profileComplete) {
-      // Usuário logado via email-link mas ainda não completou o perfil
-      document.getElementById('auth-screen').classList.remove('hidden');
-      document.getElementById('app').classList.add('hidden');
-      window._pendingUser = user;
-      window._pendingEmail = user.email;
-      showAuthStep('complete');
-      if (!_appSetupDone) { setupAuth(); }
-      return;
+      if (user.displayName || user.email) {
+        // Usuário Google ou com displayName — cria perfil automaticamente
+        const { db, doc, setDoc } = window.__firebase;
+        const name = user.displayName || user.email.split('@')[0];
+        const newProfile = {
+          name,
+          email: user.email || '',
+          photoURL: user.photoURL || '',
+          weight: 70,
+          totalRuns: 0,
+          totalDistance: 0,
+          totalDuration: 0,
+          createdAt: new Date().toISOString(),
+        };
+        try {
+          await setDoc(doc(db, 'users', user.uid), newProfile, { merge: true });
+          State.userProfile = newProfile;
+        } catch (e) {
+          console.error('Erro ao criar perfil automático:', e);
+          State.userProfile = newProfile; // usa local mesmo se Firestore falhar
+        }
+      } else {
+        // Usuário logado via email-link mas ainda não completou o perfil
+        document.getElementById('auth-screen').classList.remove('hidden');
+        document.getElementById('app').classList.add('hidden');
+        window._pendingUser = user;
+        window._pendingEmail = user.email;
+        showAuthStep('complete');
+        if (!_appSetupDone) { setupAuth(); }
+        return;
+      }
     }
 
     showApp();
@@ -107,7 +131,6 @@ async function handleAuthChange(user) {
       _appSetupDone = true;
       setupApp();
     } else {
-      // Re-login: atualiza header e garante que uma página esteja ativa
       updateHeaderUI();
       loadProfileData();
       navigateTo(State.currentPage || 'activity');
